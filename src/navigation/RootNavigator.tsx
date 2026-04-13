@@ -1,10 +1,12 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useUserStore } from '../store/useUserStore';
+import SplashScreen from '../screens/onboarding/SplashScreen';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainTabNavigator from './MainTabNavigator';
 
 export type RootStackParamList = {
+  Splash: undefined;
   Onboarding: undefined;
   Main: undefined;
 };
@@ -12,11 +14,13 @@ export type RootStackParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const isOnboardingComplete = useUserStore((state) => state.isOnboardingComplete);
+  const { isLoading, isOnboardingComplete } = useUserStore();
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {isOnboardingComplete ? (
+      {isLoading ? (
+        <Stack.Screen name="Splash" component={SplashScreen} />
+      ) : isOnboardingComplete ? (
         <Stack.Screen name="Main" component={MainTabNavigator} />
       ) : (
         <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
