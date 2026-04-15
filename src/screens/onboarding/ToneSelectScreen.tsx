@@ -3,12 +3,17 @@ import { View, Text, TouchableOpacity, FlatList, ListRenderItemInfo } from 'reac
 import { TONES } from '../../constants';
 import { Tone } from '../../types';
 import { useUserStore } from '../../store/useUserStore';
+import {
+  requestPermission,
+  scheduleDailyNotification,
+  registerPushToken,
+} from '../../services/notificationService';
 
 type ToneItem = { id: Tone; label: string; description: string };
 
 export default function ToneSelectScreen() {
   const [selectedTones, setSelectedTones] = useState<Tone[]>([]);
-  const { setSelectedTones: saveToStore, completeOnboarding } = useUserStore();
+  const { user, setSelectedTones: saveToStore, completeOnboarding } = useUserStore();
 
   const toggleTone = (tone: Tone) => {
     setSelectedTones((prev) =>
@@ -19,6 +24,17 @@ export default function ToneSelectScreen() {
   const handleComplete = async () => {
     await saveToStore(selectedTones);
     await completeOnboarding();
+
+    // 온보딩 완료 후 알림 초기화 (실패해도 앱 진입은 계속)
+    const userId = useUserStore.getState().user?.user_id ?? user?.user_id;
+    const granted = await requestPermission();
+    if (granted) {
+      await scheduleDailyNotification('09:00');
+    }
+    if (userId) {
+      await registerPushToken(userId);
+    }
+
     // isOnboardingComplete가 true로 바뀌면 RootNavigator가 자동으로 Main으로 전환
   };
 

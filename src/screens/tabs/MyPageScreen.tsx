@@ -113,6 +113,7 @@ export default function MyPageScreen({ navigation }: Props) {
 
       {/* 메뉴 */}
       <View style={{ paddingTop: 8 }}>
+        <MenuItem label="설정" onPress={() => navigation.navigate('Setting')} />
         <MenuItem label="알림 설정" onPress={() => navigation.navigate('NotificationSetting')} />
         <MenuItem label="이용약관" onPress={handleNotImplemented} />
         <MenuItem label="개인정보처리방침" onPress={handleNotImplemented} />

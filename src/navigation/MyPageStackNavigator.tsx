@@ -3,11 +3,13 @@ import { createStackNavigator } from '@react-navigation/stack';
 import MyPageScreen from '../screens/tabs/MyPageScreen';
 import ToneSelectScreen from '../screens/onboarding/ToneSelectScreen';
 import NotificationSettingScreen from '../screens/settings/NotificationSettingScreen';
+import SettingScreen from '../screens/settings/SettingScreen';
 
 export type MyPageStackParamList = {
   MyPageMain: undefined;
   ToneSelect: undefined;
   NotificationSetting: undefined;
+  Setting: undefined;
 };
 
 const Stack = createStackNavigator<MyPageStackParamList>();
@@ -25,6 +27,11 @@ export default function MyPageStackNavigator() {
         name="NotificationSetting"
         component={NotificationSettingScreen}
         options={{ headerShown: true, title: '알림 설정', headerBackTitle: '' }}
+      />
+      <Stack.Screen
+        name="Setting"
+        component={SettingScreen}
+        options={{ headerShown: true, title: '설정', headerBackTitle: '' }}
       />
     </Stack.Navigator>
   );
