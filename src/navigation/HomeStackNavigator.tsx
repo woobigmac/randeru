@@ -1,5 +1,6 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
+import { Action, DailyRecord } from '../types';
 import HomeScreen from '../screens/home/HomeScreen';
 import ActionDetailScreen from '../screens/home/ActionDetailScreen';
 import PhotoScreen from '../screens/record/PhotoScreen';
@@ -8,10 +9,10 @@ import ShareScreen from '../screens/record/ShareScreen';
 
 export type HomeStackParamList = {
   Home: undefined;
-  ActionDetail: { actionId: string };
+  ActionDetail: { action: Action };
   Photo: { recordId: string };
   Complete: { recordId: string };
-  Share: { recordId: string };
+  Share: { record: DailyRecord; action: Action };
 };
 
 const Stack = createStackNavigator<HomeStackParamList>();

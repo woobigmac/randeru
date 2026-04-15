@@ -25,7 +25,7 @@ export interface Action {
   share_copy_template: string;
 }
 
-export interface Record {
+export interface DailyRecord {
   record_id: string;
   user_id: string;
   action_id: string;

@@ -1,8 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import HomeStackNavigator from './HomeStackNavigator';
-import RecordsScreen from '../screens/tabs/RecordsScreen';
-import MyPageScreen from '../screens/tabs/MyPageScreen';
+import RecordsStackNavigator from './RecordsStackNavigator';
+import MyPageStackNavigator from './MyPageStackNavigator';
 
 export type MainTabParamList = {
   HomeTab: undefined;
@@ -22,12 +22,12 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="Records"
-        component={RecordsScreen}
+        component={RecordsStackNavigator}
         options={{ title: '기록' }}
       />
       <Tab.Screen
         name="MyPage"
-        component={MyPageScreen}
+        component={MyPageStackNavigator}
         options={{ title: '마이' }}
       />
     </Tab.Navigator>
