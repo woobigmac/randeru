@@ -5,7 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import RootNavigator from './src/navigation/RootNavigator';
-import { runSeedActions } from './src/services/seedActions';
+import { runSeedActions, runSeedSense } from './src/services/seedActions';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -15,6 +15,7 @@ export default function App() {
   useEffect(() => {
     if (__DEV__) {
       runSeedActions();
+      runSeedSense();
     }
   }, []);
 
