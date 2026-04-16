@@ -399,3 +399,77 @@ export async function runSeedConnect(): Promise<void> {
     console.error('[seed] runSeedConnect error:', e);
   }
 }
+
+// ─── environment 시드 데이터 ──────────────────────────────────────────────────
+type SeedEnvironmentInput = {
+  title: string;
+  description: string;
+  difficulty: string;
+  estimated_time: string;
+  place_tag: string;
+  share_copy_template: string;
+};
+
+const ENVIRONMENT_ACTIONS: SeedEnvironmentInput[] = [
+  { title: "길가 쓰레기 하나 줍기", description: "지구가 조금 깨끗해졌어요", difficulty: "easy", estimated_time: "1분", place_tag: "야외", share_copy_template: "오늘 지구를 조금 깨끗하게 만들었어요" },
+  { title: "분리수거 꼼꼼히 하기", description: "지구가 제자리를 찾았어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 지구가 제자리를 찾도록 도왔어요" },
+  { title: "텀블러 들고 나가기", description: "바다가 오늘 하루 조금 더 맑아졌어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "오늘 바다를 조금 더 맑게 만들었어요" },
+  { title: "장바구니 챙겨서 장보기", description: "비닐봉지 하나가 줄어들었어요", difficulty: "easy", estimated_time: "2분", place_tag: "마트", share_copy_template: "오늘 비닐봉지 하나를 줄였어요" },
+  { title: "공원 쓰레기 3개 줍기", description: "공원이 오늘 숨을 조금 더 쉬었어요", difficulty: "easy", estimated_time: "3분", place_tag: "야외", share_copy_template: "오늘 공원이 숨을 더 쉴 수 있게 도왔어요" },
+  { title: "안 쓰는 콘센트 뽑기", description: "지구가 잠깐 쉬어갈 수 있어요", difficulty: "easy", estimated_time: "1분", place_tag: "집", share_copy_template: "오늘 지구가 잠깐 쉬어갈 수 있게 했어요" },
+  { title: "오늘 하루 엘리베이터 대신 계단 이용하기", description: "내 다리도, 지구도 함께 건강해졌어요", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "오늘 나도 지구도 함께 건강해졌어요" },
+  { title: "음식 남기지 않고 다 먹기", description: "누군가 공들인 것들이 낭비되지 않았어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "오늘 음식을 하나도 낭비하지 않았어요" },
+  { title: "오늘 하루 일회용품 안 쓰기", description: "플라스틱 하나가 바다로 가지 않았어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "오늘 플라스틱 하나가 바다로 가지 않았어요" },
+  { title: "화단에 물 주기", description: "목말랐던 꽃이 오늘 물을 마셨어요", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "오늘 목말랐던 꽃에게 물을 줬어요" },
+  { title: "오늘 하루 대중교통 이용하기", description: "도로가 오늘 조금 더 한가해졌어요", difficulty: "easy", estimated_time: "2분", place_tag: "야외", share_copy_template: "오늘 도로를 조금 더 한가하게 만들었어요" },
+  { title: "빈 병 깨끗이 씻어 분리수거하기", description: "유리가 다시 유리가 될 준비를 했어요", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "오늘 유리가 다시 태어날 준비를 도왔어요" },
+  { title: "에코백 들고 나가기", description: "비닐봉지 한 장이 태어나지 않았어요", difficulty: "easy", estimated_time: "1분", place_tag: "야외", share_copy_template: "오늘 비닐봉지 한 장이 태어나지 않았어요" },
+  { title: "오늘 하루 자전거 타기", description: "바람이 오늘 기름 냄새를 맡지 않았어요", difficulty: "easy", estimated_time: "3분", place_tag: "야외", share_copy_template: "오늘 바람이 기름 냄새를 맡지 않았어요" },
+  { title: "집 안 공기 환기하기", description: "집이 오늘 깊은 숨을 쉬었어요", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "오늘 집이 깊은 숨을 쉬었어요" },
+  { title: "오늘 하루 종이컵 안 쓰기", description: "나무 한 그루가 조금 더 자랄 수 있어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "오늘 나무 한 그루가 조금 더 자랄 수 있게 했어요" },
+  { title: "작은 화분 하나 키우기 시작하기", description: "새로운 초록 친구가 생겼어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 새로운 초록 친구가 생겼어요" },
+  { title: "오늘 하루 걸어서 출퇴근하기", description: "하늘이 오늘 조금 더 파래졌어요", difficulty: "easy", estimated_time: "3분", place_tag: "야외", share_copy_template: "오늘 하늘이 조금 더 파래졌어요" },
+  { title: "손수건 사용해보기", description: "물티슈 한 장이 쓰레기가 되지 않았어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "오늘 물티슈 한 장이 쓰레기가 되지 않았어요" },
+  { title: "엄마 도와서 청소하기", description: "집이 오늘 환하게 웃었어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 집이 환하게 웃었어요" },
+  { title: "설거지 도와주기", description: "부엌이 오늘 홀가분해졌어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 부엌이 홀가분해졌어요" },
+  { title: "저녁식사 후 식탁 정리 도와주기", description: "하루의 마무리가 깔끔해졌어요", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "오늘 하루의 마무리가 깔끔해졌어요" },
+  { title: "친구 책상 청소해주기", description: "친구의 공간이 오늘 숨을 쉬었어요", difficulty: "easy", estimated_time: "3분", place_tag: "어디서나", share_copy_template: "오늘 친구의 공간이 숨을 쉬었어요" },
+  { title: "옷 정리하기", description: "옷들이 드디어 제자리를 찾았어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 옷들이 드디어 제자리를 찾았어요" },
+  { title: "내 방 책상 정리하기", description: "내 공간이 오늘 맑아졌어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 내 공간이 맑아졌어요" },
+  { title: "아빠 엄마 도와 분리수거하기", description: "가족이 함께 지구를 돌봤어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 가족이 함께 지구를 돌봤어요" },
+  { title: "음식물 쓰레기 버리고 오기", description: "집이 오늘 조금 더 가벼워졌어요", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "오늘 집이 조금 더 가벼워졌어요" },
+];
+
+/**
+ * category가 'environment'인 액션이 10개 미만일 때만 27개를 업로드한다.
+ */
+export async function runSeedEnvironment(): Promise<void> {
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, 'actions'), where('category', '==', 'environment'), limit(10)),
+    );
+    if (snapshot.size >= 10) {
+      console.log('[seed] environment 액션이 이미 존재합니다. 시딩을 건너뜁니다.');
+      return;
+    }
+
+    console.log('[seed] environment 액션을 시딩합니다...');
+    const docs: SeedAction[] = ENVIRONMENT_ACTIONS.map((a) => ({
+      title: a.title,
+      description: a.description,
+      category: 'environment',
+      difficulty: a.difficulty as Action['difficulty'],
+      estimated_time: parseMinutes(a.estimated_time),
+      place_tag: a.place_tag,
+      is_photo_required: true,
+      is_active: true,
+      share_copy_template: a.share_copy_template,
+      safety_note: '',
+      media_type: 'photo' as const,
+    }));
+    await Promise.all(docs.map((d) => addDoc(collection(db, 'actions'), d)));
+    console.log(`[seed] ${docs.length}개 environment 액션 시딩 완료`);
+  } catch (e) {
+    console.error('[seed] runSeedEnvironment error:', e);
+  }
+}
