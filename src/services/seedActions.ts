@@ -311,3 +311,91 @@ export async function runSeedKind(): Promise<void> {
     console.error('[seed] runSeedKind error:', e);
   }
 }
+
+// ─── connect 시드 데이터 ───────────────────────────────────────────────────────
+type SeedConnectInput = {
+  title: string;
+  description: string;
+  media_type: 'photo' | 'video' | 'both';
+  difficulty: string;
+  estimated_time: string;
+  place_tag: string;
+  share_copy_template: string;
+  is_photo_required: boolean;
+};
+
+const CONNECT_ACTIONS: SeedConnectInput[] = [
+  { title: "친구와 같은 음악 동시에 듣기", description: "멀리 있어도 같은 노래를 함께 들어봐요", media_type: "photo", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "친구와 같은 음악을 함께 들었어요", is_photo_required: true },
+  { title: "가족과 오래된 앨범 꺼내보기", description: "먼지 쌓인 앨범을 꺼내 함께 추억을 나눠봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 오래된 앨범을 꺼내 추억을 나눴어요", is_photo_required: true },
+  { title: "친구와 같은 책 읽기 시작하기", description: "같은 책을 함께 읽고 나중에 이야기 나눠봐요", media_type: "photo", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "친구와 같은 책을 함께 읽기 시작했어요", is_photo_required: true },
+  { title: "오랜 친구와 첫 만남 장소 다시 가기", description: "처음 만났던 그 장소를 다시 찾아봐요", media_type: "photo", difficulty: "medium", estimated_time: "3분", place_tag: "야외", share_copy_template: "오랜 친구와 처음 만났던 장소를 다시 찾았어요", is_photo_required: true },
+  { title: "가족과 좋아하는 TV 프로 같이 보기", description: "각자 핸드폰 보지 말고 함께 TV를 봐봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 함께 TV를 봤어요", is_photo_required: true },
+  { title: "친구와 서로 모르는 것 가르쳐주기", description: "내가 잘하는 것 하나를 친구에게 알려줘봐요", media_type: "video", difficulty: "easy", estimated_time: "3분", place_tag: "어디서나", share_copy_template: "친구에게 내가 잘하는 것을 가르쳐줬어요", is_photo_required: true },
+  { title: "가족과 함께 산책하기", description: "오늘 저녁 가족과 동네 한 바퀴 걸어봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "야외", share_copy_template: "가족과 함께 동네를 산책했어요", is_photo_required: true },
+  { title: "친구와 어릴 때 놀던 놀이 다시 하기", description: "친구와 어릴 때 하던 놀이를 다시 해봐요", media_type: "video", difficulty: "medium", estimated_time: "3분", place_tag: "야외", share_copy_template: "친구와 어릴 때 놀이를 다시 했어요", is_photo_required: true },
+  { title: "가족과 요리 함께 만들기", description: "오늘 한 끼를 온 가족이 함께 만들어봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 함께 요리를 만들었어요", is_photo_required: true },
+  { title: "친구와 일몰 같이 보기", description: "해지는 순간을 친구와 나란히 바라봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "야외", share_copy_template: "친구와 함께 일몰을 바라봤어요", is_photo_required: true },
+  { title: "가족과 각자 버킷리스트 공유하기", description: "서로의 꿈과 바람을 나눠봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 버킷리스트를 나눴어요", is_photo_required: true },
+  { title: "친구와 사진 교환하기", description: "내가 찍은 사진 중 친구가 나온 것을 보내봐요", media_type: "photo", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "친구와 사진을 교환했어요", is_photo_required: true },
+  { title: "가족과 함께 스트레칭하기", description: "오늘 아침 가족과 함께 몸을 풀어봐요", media_type: "video", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 함께 스트레칭을 했어요", is_photo_required: true },
+  { title: "친구와 서로 칭찬 주고받기", description: "오늘 친구의 장점을 하나씩 말해봐요", media_type: "video", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "친구와 서로 칭찬을 주고받았어요", is_photo_required: true },
+  { title: "가족과 함께 별 보기", description: "밤에 가족과 함께 하늘을 올려다봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "야외", share_copy_template: "가족과 함께 별을 봤어요", is_photo_required: true },
+  { title: "친구와 서로 소원 말하기", description: "요즘 가장 바라는 것을 친구와 나눠봐요", media_type: "video", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "친구와 서로 소원을 나눴어요", is_photo_required: true },
+  { title: "가족과 함께 일기 쓰기", description: "오늘 하루를 각자 한 줄씩 써봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 함께 일기를 썼어요", is_photo_required: true },
+  { title: "친구와 서로 사진 찍어주기", description: "오늘 친구의 가장 예쁜 순간을 담아봐요", media_type: "photo", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "친구의 가장 예쁜 순간을 담았어요", is_photo_required: true },
+  { title: "가족과 좋아하는 유튜브 영상 공유하기", description: "요즘 내가 푹 빠진 영상을 가족과 같이 봐봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 좋아하는 영상을 함께 봤어요", is_photo_required: true },
+  { title: "친구와 서로 요즘 고민 나누기", description: "말하지 못했던 고민을 꺼내봐요", media_type: "video", difficulty: "medium", estimated_time: "3분", place_tag: "어디서나", share_copy_template: "친구와 서로 고민을 나눴어요", is_photo_required: true },
+  { title: "가족과 함께 노래 부르기", description: "오늘 가족과 좋아하는 노래를 같이 불러봐요", media_type: "video", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 함께 노래를 불렀어요", is_photo_required: true },
+  { title: "가족과 함께 영화 보기", description: "오늘 저녁 가족과 함께 영화 한 편 봐봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 함께 영화를 봤어요", is_photo_required: true },
+  { title: "친구와 서로 꿈 이야기하기", description: "어젯밤 꿈 이야기를 친구와 나눠봐요", media_type: "video", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "친구와 꿈 이야기를 나눴어요", is_photo_required: true },
+  { title: "가족과 함께 그림 그리기", description: "오늘 가족과 함께 그림 한 장을 그려봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 함께 그림을 그렸어요", is_photo_required: true },
+  { title: "친구와 서로 10년 후 모습 상상하기", description: "10년 후 나는 어떤 모습일까요?", media_type: "video", difficulty: "medium", estimated_time: "3분", place_tag: "어디서나", share_copy_template: "친구와 10년 후 모습을 상상했어요", is_photo_required: true },
+  { title: "가족과 함께 동네 카페 가기", description: "오늘 가족과 함께 카페에서 시간을 보내봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "카페", share_copy_template: "가족과 함께 카페에서 시간을 보냈어요", is_photo_required: true },
+  { title: "친구와 함께 새로운 곳 가보기", description: "한 번도 안 가본 곳을 친구와 함께 가봐요", media_type: "photo", difficulty: "medium", estimated_time: "3분", place_tag: "야외", share_copy_template: "친구와 새로운 곳을 함께 가봤어요", is_photo_required: true },
+  { title: "가족과 함께 요즘 관심사 나누기", description: "요즘 빠져있는 것을 가족에게 소개해봐요", media_type: "video", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족에게 요즘 관심사를 소개했어요", is_photo_required: true },
+  { title: "친구와 함께 아무것도 안 하기", description: "그냥 나란히 앉아 있는 것만으로도 연결돼요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "어디서나", share_copy_template: "친구와 그냥 나란히 앉아 있었어요", is_photo_required: true },
+  { title: "친구와 시집 나누기", description: "좋아하는 시 한 편을 친구와 나눠봐요", media_type: "photo", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "친구와 시 한 편을 나눴어요", is_photo_required: true },
+  { title: "가족과 시집 나누기", description: "좋아하는 시 한 편을 가족과 함께 읽어봐요", media_type: "photo", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "가족과 시 한 편을 함께 읽었어요", is_photo_required: true },
+  { title: "친구와 스터디 함께 하기", description: "오늘 친구와 나란히 앉아 공부해봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "어디서나", share_copy_template: "친구와 함께 스터디를 했어요", is_photo_required: true },
+  { title: "가족과 어릴 적 여행지 다시 추억해보기", description: "함께 갔던 여행지 사진을 꺼내 이야기 나눠봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 어릴 적 여행지를 추억했어요", is_photo_required: true },
+  { title: "친구와 노래방 가서 듀엣곡 부르기", description: "친구와 함께 듀엣곡을 불러봐요", media_type: "video", difficulty: "easy", estimated_time: "3분", place_tag: "노래방", share_copy_template: "친구와 노래방에서 듀엣곡을 불렀어요", is_photo_required: true },
+  { title: "친구가 좋아하는 메뉴 함께 먹기", description: "오늘은 친구가 좋아하는 걸로 골라봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "식당", share_copy_template: "친구가 좋아하는 메뉴를 함께 먹었어요", is_photo_required: true },
+  { title: "아빠가 좋아하는 메뉴 함께 먹기", description: "오늘은 아빠가 좋아하는 걸로 골라봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "식당", share_copy_template: "아빠가 좋아하는 메뉴를 함께 먹었어요", is_photo_required: true },
+  { title: "엄마가 좋아하는 메뉴 함께 먹기", description: "오늘은 엄마가 좋아하는 걸로 골라봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "식당", share_copy_template: "엄마가 좋아하는 메뉴를 함께 먹었어요", is_photo_required: true },
+  { title: "아빠에게 책 추천받기", description: "아빠가 요즘 읽는 책을 물어봐요", media_type: "photo", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "아빠에게 책을 추천받았어요", is_photo_required: true },
+  { title: "엄마에게 책 추천받기", description: "엄마가 요즘 읽는 책을 물어봐요", media_type: "photo", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "엄마에게 책을 추천받았어요", is_photo_required: true },
+];
+
+/**
+ * category가 'connect'인 액션이 10개 미만일 때만 39개를 업로드한다.
+ */
+export async function runSeedConnect(): Promise<void> {
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, 'actions'), where('category', '==', 'connect'), limit(10)),
+    );
+    if (snapshot.size >= 10) {
+      console.log('[seed] connect 액션이 이미 존재합니다. 시딩을 건너뜁니다.');
+      return;
+    }
+
+    console.log('[seed] connect 액션을 시딩합니다...');
+    const docs: SeedAction[] = CONNECT_ACTIONS.map((a) => ({
+      title: a.title,
+      description: a.description,
+      category: 'connect',
+      difficulty: a.difficulty as Action['difficulty'],
+      estimated_time: parseMinutes(a.estimated_time),
+      place_tag: a.place_tag,
+      is_photo_required: a.is_photo_required,
+      is_active: true,
+      share_copy_template: a.share_copy_template,
+      safety_note: '',
+      media_type: a.media_type,
+    }));
+    await Promise.all(docs.map((d) => addDoc(collection(db, 'actions'), d)));
+    console.log(`[seed] ${docs.length}개 connect 액션 시딩 완료`);
+  } catch (e) {
+    console.error('[seed] runSeedConnect error:', e);
+  }
+}
