@@ -6,13 +6,16 @@ import {
   Alert,
   Platform,
   ScrollView,
+  StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useUserStore } from '../../store/useUserStore';
 import { MyPageStackParamList } from '../../navigation/MyPageStackNavigator';
 import { APP_VERSION } from '../../constants';
+import { Colors, Radius, Spacing } from '../../constants/theme';
 
 type Props = {
   navigation: StackNavigationProp<MyPageStackParamList, 'Setting'>;
@@ -25,17 +28,16 @@ export default function SettingScreen({ navigation }: Props) {
   const setNickname = useUserStore((s) => s.setNickname);
   const clearUser = useUserStore((s) => s.clearUser);
 
-  // ─── 닉네임 수정 ──────────────────────────────────────────────────────────
   const handleEditNickname = () => {
     if (Platform.OS === 'ios') {
       Alert.prompt(
         '닉네임 수정',
-        '새 닉네임을 입력하세요 (2~10자, 특수문자 불가)',
+        '2~10자, 한글/영문/숫자만 사용 가능해요',
         async (text) => {
           if (!text) return;
           const trimmed = text.trim();
           if (!NICKNAME_REGEX.test(trimmed)) {
-            Alert.alert('유효하지 않은 닉네임', '2~10자, 한글/영문/숫자만 사용할 수 있어요.');
+            Alert.alert('유효하지 않은 닉네임', '2~10자, 특수문자는 사용할 수 없어요.');
             return;
           }
           await setNickname(trimmed);
@@ -45,12 +47,10 @@ export default function SettingScreen({ navigation }: Props) {
         user?.nickname ?? '',
       );
     } else {
-      // Android: Alert.prompt 미지원 — 별도 입력 UI 필요 (추후 개선)
       Alert.alert('닉네임 수정', 'iOS 기기에서만 지원됩니다.');
     }
   };
 
-  // ─── 탈퇴 ─────────────────────────────────────────────────────────────────
   const handleDeleteAccount = () => {
     Alert.alert(
       '탈퇴하기',
@@ -62,15 +62,11 @@ export default function SettingScreen({ navigation }: Props) {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (user?.user_id) {
-                await deleteDoc(doc(db, 'users', user.user_id));
-              }
+              if (user?.user_id) await deleteDoc(doc(db, 'users', user.user_id));
             } catch (e) {
               console.warn('deleteDoc error:', e);
             } finally {
               await clearUser();
-              // clearUser가 isOnboardingComplete를 false로 설정 →
-              // RootNavigator가 자동으로 OnboardingNavigator로 전환
             }
           },
         },
@@ -78,20 +74,19 @@ export default function SettingScreen({ navigation }: Props) {
     );
   };
 
-  const handleNotImplemented = () => Alert.alert('준비 중', '준비 중입니다.');
-
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 48 }}>
-      <SettingItem label="닉네임 수정" onPress={handleEditNickname} />
-      <SettingItem
-        label="알림 설정"
-        onPress={() => navigation.navigate('NotificationSetting')}
-      />
-      <SettingItem label="이용약관" onPress={handleNotImplemented} />
-      <SettingItem label="개인정보처리방침" onPress={handleNotImplemented} />
-      <SettingItem label={`앱 버전 ${APP_VERSION}`} isStatic />
-      <SettingItem label="탈퇴하기" onPress={handleDeleteAccount} isDanger />
-    </ScrollView>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.menuSection}>
+          <SettingItem label="닉네임 수정" onPress={handleEditNickname} />
+          <SettingItem label="알림 설정" onPress={() => navigation.navigate('NotificationSetting')} />
+          <SettingItem label="이용약관" onPress={() => Alert.alert('준비 중', '준비 중입니다.')} />
+          <SettingItem label="개인정보처리방침" onPress={() => Alert.alert('준비 중', '준비 중입니다.')} />
+          <SettingItem label={`앱 버전 ${APP_VERSION}`} isStatic />
+          <SettingItem label="탈퇴하기" onPress={handleDeleteAccount} isDanger />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -107,18 +102,33 @@ function SettingItem({ label, onPress, isStatic = false, isDanger = false }: Set
     <TouchableOpacity
       onPress={onPress}
       disabled={isStatic}
-      style={{
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}
+      style={styles.item}
     >
-      <Text style={{ fontSize: 15, color: isDanger ? '#e53e3e' : '#111' }}>{label}</Text>
-      {!isStatic && <Text style={{ fontSize: 14, color: '#ccc' }}>›</Text>}
+      <Text style={[styles.label, isDanger && styles.labelDanger]}>{label}</Text>
+      {!isStatic && <Text style={styles.arrow}>›</Text>}
     </TouchableOpacity>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  scroll: { paddingTop: Spacing.md, paddingBottom: Spacing.xxl },
+  menuSection: {
+    backgroundColor: Colors.white,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+  },
+  item: {
+    paddingVertical: 16,
+    paddingHorizontal: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  label: { fontSize: 15, color: Colors.text },
+  labelDanger: { color: Colors.error },
+  arrow: { fontSize: 18, color: Colors.textTertiary },
+});

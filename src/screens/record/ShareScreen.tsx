@@ -7,7 +7,9 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
 import ViewShot, { captureRef } from 'react-native-view-shot';
@@ -17,8 +19,10 @@ import { useActionStore } from '../../store/useActionStore';
 import { markAsShared } from '../../services/recordService';
 import { showRewardedAd } from '../../services/adService';
 import { DailyRecord, Action } from '../../types';
+import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
+import { Button } from '../../components/Button';
+import { Header } from '../../components/Header';
 
-// HomeStack / RecordsStack 어디서든 재사용 가능하도록 제네릭 타입 사용
 type ShareRouteParams = { record: DailyRecord; action: Action };
 type Props = {
   navigation: StackNavigationProp<Record<string, ShareRouteParams | undefined>, string>;
@@ -27,99 +31,130 @@ type Props = {
 
 const SHARE_HASHTAGS = '#랜데루 #오늘의인간다움 #하루한번작은행동';
 
-// ─── 공유 카드 컴포넌트 ────────────────────────────────────────────────────────
-type ShareCardProps = {
-  title: string;
-  copyTemplate: string;
-  photoUrl?: string;
-};
+// ─── 공유 카드 ──────────────────────────────────────────────────────────────
+type ShareCardProps = { title: string; copyTemplate: string; photoUrl?: string };
 
 const ShareCard = React.forwardRef<ViewShot, ShareCardProps>(
   ({ title, copyTemplate, photoUrl }, ref) => (
     <ViewShot ref={ref} options={{ format: 'jpg', quality: 0.95 }}>
-      <View
-        style={{
-          width: 320,
-          backgroundColor: '#fff',
-          borderRadius: 16,
-          overflow: 'hidden',
-          padding: 24,
-        }}
-      >
+      <View style={cardStyles.card}>
         {photoUrl ? (
           <Image
             source={{ uri: photoUrl }}
-            style={{ width: '100%', height: 200, borderRadius: 8, marginBottom: 16 }}
+            style={cardStyles.photo}
             resizeMode="cover"
           />
         ) : (
-          <View
-            style={{
-              width: '100%',
-              height: 120,
-              borderRadius: 8,
-              backgroundColor: '#f0f0f0',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 16,
-            }}
-          >
-            <Text style={{ fontSize: 14, color: '#aaa' }}>사진 없음</Text>
+          <View style={cardStyles.photoPlaceholder}>
+            <Text style={{ fontSize: 13, color: Colors.textTertiary }}>사진 없음</Text>
           </View>
         )}
-
-        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>{title}</Text>
-        <Text style={{ fontSize: 14, color: '#555', lineHeight: 20, marginBottom: 12 }}>
-          {copyTemplate}
-        </Text>
-        <Text style={{ fontSize: 12, color: '#999', marginBottom: 16 }}>
-          {SHARE_HASHTAGS}
-        </Text>
-
-        <Text style={{ fontSize: 11, color: '#bbb', textAlign: 'right' }}>랜데루</Text>
+        <Text style={cardStyles.title}>{title}</Text>
+        <Text style={cardStyles.copy}>{copyTemplate}</Text>
+        <Text style={cardStyles.hashtag}>{SHARE_HASHTAGS}</Text>
+        <Text style={cardStyles.watermark}>랜데루</Text>
       </View>
     </ViewShot>
   ),
 );
 
-// ─── 메인 ShareScreen ──────────────────────────────────────────────────────────
+const cardStyles = StyleSheet.create({
+  card: {
+    width: 320,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    padding: Spacing.lg,
+  },
+  photo: { width: '100%', height: 200, borderRadius: Radius.md, marginBottom: Spacing.md },
+  photoPlaceholder: {
+    width: '100%',
+    height: 120,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+  },
+  title: {
+    fontFamily: Fonts.handwriting,
+    fontSize: 18,
+    color: Colors.text,
+    marginBottom: Spacing.sm,
+  },
+  copy: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: Spacing.sm,
+  },
+  hashtag: { fontSize: 12, color: Colors.textTertiary, marginBottom: Spacing.md },
+  watermark: {
+    fontFamily: Fonts.handwriting,
+    fontSize: 11,
+    color: Colors.textTertiary,
+    textAlign: 'right',
+  },
+});
+
+// ─── 공유 버튼 카드 ──────────────────────────────────────────────────────────
+function ShareOptionCard({
+  label,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.75}
+      style={[optStyles.card, disabled && optStyles.disabled]}
+    >
+      <Text style={optStyles.label}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+const optStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  disabled: { opacity: 0.4 },
+  label: { fontSize: 15, fontWeight: '600', color: Colors.text },
+});
+
+// ─── 메인 ShareScreen ────────────────────────────────────────────────────────
 export default function ShareScreen({ navigation, route }: Props) {
   const { record, action } = route.params;
   const { todayRecord, setActionShared } = useActionStore();
   const cardRef = useRef<ViewShot>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  /** 카드 이미지를 캡처해서 URI 반환 */
-  const captureCard = async (): Promise<string> => {
-    const uri = await captureRef(cardRef, { format: 'jpg', quality: 0.95 });
-    return uri;
-  };
+  const captureCard = async (): Promise<string> =>
+    captureRef(cardRef, { format: 'jpg', quality: 0.95 });
 
-  /** 공유 완료 후 공통 처리 */
   const finalizeShare = async (channel: string) => {
     try {
       await markAsShared(record.record_id, channel);
-      // 오늘의 액션과 동일한 record일 때만 actionStore 상태 갱신
-      if (todayRecord?.record_id === record.record_id) {
-        setActionShared();
-      }
+      if (todayRecord?.record_id === record.record_id) setActionShared();
     } catch (e) {
       console.error('finalizeShare error:', e);
     }
   };
 
-  /** SNS 공유 공통 플로우: 광고 → 캡처 → 공유 → 기록 */
   const handleSnsShare = async (channel: string) => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
-      // ① 광고 시청 (실패해도 공유 계속 진행)
       await showRewardedAd();
-
-      // ② 카드 캡처
       const uri = await captureCard();
-
-      // ③ 시스템 공유 시트 호출
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(uri, { mimeType: 'image/jpeg' });
@@ -127,8 +162,6 @@ export default function ShareScreen({ navigation, route }: Props) {
         Alert.alert('공유 불가', '이 기기에서는 공유 기능을 사용할 수 없어요.');
         return;
       }
-
-      // ④ 공유 완료 처리
       await finalizeShare(channel);
     } catch (e) {
       console.error('handleSnsShare error:', e);
@@ -138,7 +171,6 @@ export default function ShareScreen({ navigation, route }: Props) {
     }
   };
 
-  /** 링크 복사: 광고 없이 바로 복사 */
   const handleCopyLink = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -148,7 +180,6 @@ export default function ShareScreen({ navigation, route }: Props) {
       Alert.alert('복사 완료', '클립보드에 복사됐어요!');
       await finalizeShare('link');
     } catch (e) {
-      console.error('handleCopyLink error:', e);
       Alert.alert('오류', '복사 중 문제가 발생했어요.');
     } finally {
       setIsProcessing(false);
@@ -156,113 +187,67 @@ export default function ShareScreen({ navigation, route }: Props) {
   };
 
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{ padding: 24, paddingBottom: 48, alignItems: 'center' }}
-    >
-      {/* 뒤로가기 */}
-      <TouchableOpacity
-        onPress={() => navigation.goBack()}
-        style={{ alignSelf: 'flex-start', marginBottom: 24, marginTop: 16 }}
+    <SafeAreaView style={styles.container}>
+      <Header title="오늘을 공유해요" showBack />
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={{ fontSize: 14, color: '#888' }}>← 뒤로</Text>
-      </TouchableOpacity>
-
-      <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 24 }}>
-        오늘을 공유해보세요
-      </Text>
-
-      {/* 공유 카드 미리보기 */}
-      <ShareCard
-        ref={cardRef}
-        title={action.title}
-        copyTemplate={action.share_copy_template}
-        photoUrl={record.photo_url}
-      />
-
-      {/* 로딩 인디케이터 */}
-      {isProcessing && (
-        <View style={{ marginVertical: 16 }}>
-          <ActivityIndicator size="small" />
-          <Text style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
-            광고 로드 중... 잠시만 기다려주세요
-          </Text>
+        {/* 공유 카드 미리보기 */}
+        <View style={styles.cardWrapper}>
+          <ShareCard
+            ref={cardRef}
+            title={action.title}
+            copyTemplate={action.share_copy_template}
+            photoUrl={record.photo_url}
+          />
         </View>
-      )}
 
-      {/* 공유 버튼 영역 */}
-      <View style={{ width: '100%', marginTop: 32, gap: 12 }}>
-        <TouchableOpacity
-          onPress={() => handleSnsShare('instagram')}
-          disabled={isProcessing}
-          style={{
-            paddingVertical: 14,
-            alignItems: 'center',
-            backgroundColor: isProcessing ? '#ccc' : '#000',
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 15, fontWeight: 'bold' }}>
-            인스타그램에 공유
-          </Text>
-        </TouchableOpacity>
+        {/* 로딩 */}
+        {isProcessing && (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={Colors.primary} />
+            <Text style={styles.loadingText}>잠시만 기다려주세요...</Text>
+          </View>
+        )}
 
-        <TouchableOpacity
-          onPress={() => handleSnsShare('threads')}
-          disabled={isProcessing}
-          style={{
-            paddingVertical: 14,
-            alignItems: 'center',
-            backgroundColor: isProcessing ? '#ccc' : '#000',
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 15, fontWeight: 'bold' }}>
-            스레드에 공유
-          </Text>
-        </TouchableOpacity>
+        {/* 공유 옵션 */}
+        <View style={styles.optionGrid}>
+          <ShareOptionCard label="인스타그램" onPress={() => handleSnsShare('instagram')} disabled={isProcessing} />
+          <ShareOptionCard label="스레드" onPress={() => handleSnsShare('threads')} disabled={isProcessing} />
+          <ShareOptionCard label="카카오톡" onPress={() => handleSnsShare('kakaotalk')} disabled={isProcessing} />
+          <ShareOptionCard label="링크 복사" onPress={handleCopyLink} disabled={isProcessing} />
+        </View>
 
-        <TouchableOpacity
-          onPress={() => handleSnsShare('kakaotalk')}
-          disabled={isProcessing}
-          style={{
-            paddingVertical: 14,
-            alignItems: 'center',
-            backgroundColor: isProcessing ? '#ccc' : '#FEE500',
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: '#000', fontSize: 15, fontWeight: 'bold' }}>
-            카카오톡에 공유
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handleCopyLink}
-          disabled={isProcessing}
-          style={{
-            paddingVertical: 14,
-            alignItems: 'center',
-            borderWidth: 1.5,
-            borderColor: isProcessing ? '#ccc' : '#000',
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: isProcessing ? '#ccc' : '#000', fontSize: 15, fontWeight: 'bold' }}>
-            링크 복사
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 기록만 남기기 */}
-      <TouchableOpacity
-        onPress={() => navigation.popToTop()}
-        style={{ marginTop: 32 }}
-      >
-        <Text style={{ fontSize: 14, color: '#aaa', textDecorationLine: 'underline' }}>
-          기록만 남기기
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {/* 기록만 남기기 */}
+        <Button
+          label="기록만 남기기"
+          onPress={() => navigation.popToTop()}
+          variant="text"
+          style={{ marginTop: Spacing.xl }}
+        />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  scroll: { padding: Spacing.lg, paddingBottom: Spacing.xxl, alignItems: 'center' },
+  cardWrapper: {
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 5,
+    marginBottom: Spacing.xl,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  loadingText: { fontSize: 13, color: Colors.textSecondary },
+  optionGrid: { width: '100%', gap: Spacing.sm },
+});

@@ -8,7 +8,9 @@ import {
   ScrollView,
   ActivityIndicator,
   ListRenderItemInfo,
+  StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -17,36 +19,33 @@ import { useRecordStore, RecordWithAction } from '../../store/useRecordStore';
 import { RecordsStackParamList } from '../../navigation/RecordsStackNavigator';
 import { MainTabParamList } from '../../navigation/MainTabNavigator';
 import { TONES } from '../../constants';
+import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
+import { EmptyState } from '../../components/EmptyState';
 import { Tone } from '../../types';
 
 type RecordsNavProp = StackNavigationProp<RecordsStackParamList, 'RecordsList'>;
 
-const ITEM_HEIGHT = 84;
+const ITEM_HEIGHT = 88;
 const FILTER_OPTIONS: Array<{ id: 'all' | Tone; label: string }> = [
   { id: 'all', label: '전체' },
   ...TONES.map((t) => ({ id: t.id, label: t.label })),
 ];
-
-const formatDate = (dateStr: string) => dateStr.replace(/-/g, '.');
+const formatDate = (d: string) => d.replace(/-/g, '.');
 
 export default function RecordsScreen() {
   const navigation = useNavigation<RecordsNavProp>();
   const tabNavigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
-
   const user = useUserStore((s) => s.user);
   const { stats, isLoading, selectedFilter, loadRecords, setFilter, getFilteredRecords } =
     useRecordStore();
 
   useEffect(() => {
-    if (user?.user_id) {
-      loadRecords(user.user_id);
-    }
+    if (user?.user_id) loadRecords(user.user_id);
   }, [user?.user_id]);
 
   const filteredRecords = getFilteredRecords();
 
   const keyExtractor = useCallback((item: RecordWithAction) => item.record.record_id, []);
-
   const getItemLayout = useCallback(
     (_: ArrayLike<RecordWithAction> | null | undefined, index: number) => ({
       length: ITEM_HEIGHT,
@@ -62,46 +61,19 @@ export default function RecordsScreen() {
       return (
         <TouchableOpacity
           onPress={() => navigation.navigate('RecordDetail', { record, action })}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            height: ITEM_HEIGHT,
-            paddingHorizontal: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: '#f0f0f0',
-          }}
+          style={styles.item}
+          activeOpacity={0.75}
         >
-          {/* 썸네일 */}
           {record.photo_uploaded && record.photo_url ? (
-            <Image
-              source={{ uri: record.photo_url }}
-              style={{ width: 60, height: 60, borderRadius: 8, marginRight: 12 }}
-              resizeMode="cover"
-            />
+            <Image source={{ uri: record.photo_url }} style={styles.thumbnail} resizeMode="cover" />
           ) : (
-            <View
-              style={{
-                width: 60,
-                height: 60,
-                borderRadius: 8,
-                backgroundColor: '#f5f5f5',
-                marginRight: 12,
-              }}
-            />
+            <View style={styles.thumbnailPlaceholder} />
           )}
-
-          {/* 텍스트 */}
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '600', marginBottom: 2 }} numberOfLines={1}>
-              {action.title}
-            </Text>
-            <Text style={{ fontSize: 12, color: '#888', marginBottom: 2 }}>
-              {formatDate(record.action_date)}
-            </Text>
+          <View style={styles.itemText}>
+            <Text style={styles.itemTitle} numberOfLines={1}>{action.title}</Text>
+            <Text style={styles.itemDate}>{formatDate(record.action_date)}</Text>
             {record.memo ? (
-              <Text style={{ fontSize: 12, color: '#555' }} numberOfLines={1}>
-                {record.memo}
-              </Text>
+              <Text style={styles.itemMemo} numberOfLines={1}>{record.memo}</Text>
             ) : null}
           </View>
         </TouchableOpacity>
@@ -110,39 +82,22 @@ export default function RecordsScreen() {
     [navigation],
   );
 
-  const renderEmpty = () => (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 }}>
-      <Text style={{ fontSize: 16, color: '#888', marginBottom: 24 }}>아직 기록이 없어요</Text>
-      <TouchableOpacity
-        onPress={() => tabNavigation.navigate('HomeTab')}
-        style={{ paddingVertical: 12, paddingHorizontal: 24, backgroundColor: '#000', borderRadius: 8 }}
-      >
-        <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>
-          오늘의 랜데루 — 뽑으러 가기
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
-    <View style={{ flex: 1 }}>
-      {/* 상단 요약 */}
-      <View style={{ padding: 20, paddingBottom: 12 }}>
-        <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 8 }}>기록</Text>
-        <View style={{ flexDirection: 'row', gap: 16 }}>
-          <Text style={{ fontSize: 14, color: '#555' }}>
-            누적 <Text style={{ fontWeight: 'bold', color: '#000' }}>{stats.totalCount}번</Text>
-          </Text>
-          <Text style={{ fontSize: 14, color: '#555' }}>
-            {stats.streakDays > 0 ? (
-              <>
-                <Text style={{ fontWeight: 'bold', color: '#000' }}>{stats.streakDays}일</Text>{' '}
-                연속
-              </>
-            ) : (
-              '오늘 첫 번째 도전해봐요!'
-            )}
-          </Text>
+    <SafeAreaView style={styles.container}>
+      {/* 상단 타이틀 */}
+      <View style={styles.header}>
+        <Text style={styles.pageTitle}>기록</Text>
+      </View>
+
+      {/* 통계 카드 */}
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{stats.totalCount}</Text>
+          <Text style={styles.statLabel}>누적 액션</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{stats.streakDays}</Text>
+          <Text style={styles.statLabel}>일 연속</Text>
         </View>
       </View>
 
@@ -150,7 +105,7 @@ export default function RecordsScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12, gap: 8 }}
+        contentContainerStyle={styles.filterRow}
       >
         {FILTER_OPTIONS.map((opt) => {
           const isSelected = selectedFilter === opt.id;
@@ -158,16 +113,9 @@ export default function RecordsScreen() {
             <TouchableOpacity
               key={opt.id}
               onPress={() => setFilter(opt.id)}
-              style={{
-                paddingVertical: 6,
-                paddingHorizontal: 14,
-                borderRadius: 20,
-                borderWidth: 1.5,
-                borderColor: isSelected ? '#000' : '#ddd',
-                backgroundColor: isSelected ? '#000' : '#fff',
-              }}
+              style={[styles.filterPill, isSelected && styles.filterPillSelected]}
             >
-              <Text style={{ fontSize: 13, color: isSelected ? '#fff' : '#555', fontWeight: isSelected ? 'bold' : 'normal' }}>
+              <Text style={[styles.filterText, isSelected && styles.filterTextSelected]}>
                 {opt.label}
               </Text>
             </TouchableOpacity>
@@ -177,8 +125,8 @@ export default function RecordsScreen() {
 
       {/* 리스트 */}
       {isLoading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -186,10 +134,88 @@ export default function RecordsScreen() {
           keyExtractor={keyExtractor}
           renderItem={renderItem}
           getItemLayout={getItemLayout}
-          ListEmptyComponent={renderEmpty}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={filteredRecords.length === 0 ? { flex: 1 } : undefined}
+          ListEmptyComponent={
+            <EmptyState
+              message="아직 기록이 없어요"
+              ctaLabel="오늘의 랜데루 — 뽑으러 가기"
+              onCtaPress={() => tabNavigation.navigate('HomeTab')}
+            />
+          }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.sm },
+  pageTitle: {
+    fontFamily: Fonts.handwriting,
+    fontSize: 28,
+    color: Colors.text,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontFamily: Fonts.handwriting,
+    fontSize: 28,
+    color: Colors.primary,
+    marginBottom: 2,
+  },
+  statLabel: { fontSize: 12, color: Colors.textSecondary },
+  filterRow: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+    paddingBottom: Spacing.md,
+  },
+  filterPill: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+  },
+  filterPillSelected: { backgroundColor: Colors.primary },
+  filterText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
+  filterTextSelected: { color: Colors.white, fontWeight: '600' },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: ITEM_HEIGHT,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  thumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: Radius.sm,
+    marginRight: Spacing.md,
+  },
+  thumbnailPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.surface,
+    marginRight: Spacing.md,
+  },
+  itemText: { flex: 1 },
+  itemTitle: { fontSize: 15, fontWeight: '600', color: Colors.text, marginBottom: 2 },
+  itemDate: { fontSize: 12, color: Colors.textTertiary, marginBottom: 2 },
+  itemMemo: { fontSize: 12, color: Colors.textSecondary },
+});

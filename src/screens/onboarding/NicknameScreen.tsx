@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { useUserStore } from '../../store/useUserStore';
+import { Button } from '../../components/Button';
+import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 
 type Props = {
   navigation: StackNavigationProp<OnboardingStackParamList, 'Nickname'>;
@@ -21,6 +31,7 @@ function validate(value: string): string {
 export default function NicknameScreen({ navigation }: Props) {
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const setNicknameStore = useUserStore((state) => state.setNickname);
 
   const handleChange = (value: string) => {
@@ -29,12 +40,9 @@ export default function NicknameScreen({ navigation }: Props) {
   };
 
   const handleNext = async () => {
-    const validationError = validate(nickname);
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-    await setNicknameStore(nickname);
+    const err = validate(nickname);
+    if (err) { setError(err); return; }
+    await setNicknameStore(nickname.trim());
     navigation.navigate('ToneSelect');
   };
 
@@ -45,46 +53,82 @@ export default function NicknameScreen({ navigation }: Props) {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={{ flex: 1, padding: 24, justifyContent: 'center' }}>
-        <Text style={{ fontSize: 26, fontWeight: 'bold', marginBottom: 8 }}>
-          어떻게 불러드릴까요?
-        </Text>
-        <Text style={{ fontSize: 14, color: '#888', marginBottom: 40 }}>
-          실제 이름이 아니어도 괜찮아요
-        </Text>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <Text style={styles.title}>어떻게 불러드릴까요?</Text>
+          <Text style={styles.subtitle}>실제 이름이 아니어도 괜찮아요</Text>
 
-        <TextInput
-          value={nickname}
-          onChangeText={handleChange}
-          placeholder="닉네임 입력"
-          maxLength={10}
-          autoFocus
-          style={{
-            borderBottomWidth: 1.5,
-            borderBottomColor: error ? '#e53e3e' : '#000',
-            paddingVertical: 8,
-            fontSize: 20,
-            marginBottom: 8,
-          }}
-        />
-        {error ? (
-          <Text style={{ color: '#e53e3e', fontSize: 12, marginTop: 4 }}>{error}</Text>
-        ) : null}
+          <TextInput
+            value={nickname}
+            onChangeText={handleChange}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            placeholder="닉네임 입력"
+            placeholderTextColor={Colors.textTertiary}
+            maxLength={10}
+            autoFocus
+            style={[
+              styles.input,
+              isFocused && styles.inputFocused,
+              !!error && styles.inputError,
+            ]}
+          />
+          {error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : null}
+        </View>
 
-        <TouchableOpacity
-          onPress={handleNext}
-          disabled={!isValid}
-          style={{
-            marginTop: 48,
-            paddingVertical: 16,
-            alignItems: 'center',
-            backgroundColor: isValid ? '#000' : '#d0d0d0',
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>다음</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.buttonArea}>
+          <Button label="다음" onPress={handleNext} disabled={!isValid} />
+        </View>
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: Spacing.lg,
+    justifyContent: 'center',
+  },
+  title: {
+    fontFamily: Fonts.handwriting,
+    fontSize: 28,
+    color: Colors.text,
+    marginBottom: Spacing.sm,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xl,
+  },
+  input: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    fontSize: 18,
+    color: Colors.text,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  inputFocused: {
+    borderColor: Colors.primary,
+  },
+  inputError: {
+    borderColor: Colors.error,
+  },
+  errorText: {
+    color: Colors.error,
+    fontSize: 12,
+    marginTop: Spacing.xs,
+  },
+  buttonArea: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg,
+  },
+});
