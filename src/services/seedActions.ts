@@ -232,3 +232,82 @@ export async function runSeedSense(): Promise<void> {
     console.error('[seed] runSeedSense error:', e);
   }
 }
+
+// ─── kind 시드 데이터 ──────────────────────────────────────────────────────────
+type SeedKindInput = {
+  title: string;
+  description: string;
+  media_type: 'photo' | 'video' | 'both';
+  difficulty: string;
+  estimated_time: string;
+  place_tag: string;
+  share_copy_template: string;
+  is_photo_required: boolean;
+};
+
+const KIND_ACTIONS: SeedKindInput[] = [
+  { title: "친구에게 '사랑해' 말하고 반응 찍기", description: "갑작스러운 고백에 친구 반응이 궁금하지 않나요?", media_type: "video", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "친구에게 사랑한다고 말했어요", is_photo_required: true },
+  { title: "부모님께 안아드리고 사진 찍기", description: "오늘 아무 이유 없이 부모님을 꼭 안아봐요", media_type: "photo", difficulty: "easy", estimated_time: "1분", place_tag: "집", share_copy_template: "오늘 부모님을 꼭 안아드렸어요", is_photo_required: true },
+  { title: "가족에게 직접 만든 간식 선물하기", description: "간단한 간식이라도 직접 만들어 건네봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족에게 직접 만든 간식을 선물했어요", is_photo_required: true },
+  { title: "친구에게 갑자기 꽃 선물하기", description: "이유 없이 꽃 한 송이를 건네봐요", media_type: "video", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "친구에게 이유 없이 꽃을 선물했어요", is_photo_required: true },
+  { title: "부모님 어릴 적 사진 찾아 드리기", description: "오래된 가족 앨범에서 사진을 찾아 보여드려요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "부모님 옛날 사진을 찾아드렸어요", is_photo_required: true },
+  { title: "친구에게 손편지 써서 전달하기", description: "문자 말고 손으로 쓴 편지를 건네봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "어디서나", share_copy_template: "친구에게 손편지를 써서 전달했어요", is_photo_required: true },
+  { title: "가족과 셀카 찍기", description: "오늘 가족과 함께한 순간을 사진으로 남겨봐요", media_type: "photo", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "오늘 가족과 함께한 순간을 담았어요", is_photo_required: true },
+  { title: "친구 생일 깜짝 축하 영상 찍기", description: "친구 생일에 깜짝 축하 메시지를 영상으로", media_type: "video", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "친구 생일을 깜짝 영상으로 축하했어요", is_photo_required: true },
+  { title: "부모님 요리 도와드리기", description: "오늘 식사 준비를 함께 해봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 부모님 요리를 도와드렸어요", is_photo_required: true },
+  { title: "친구에게 응원 메시지 영상 보내기", description: "힘들어하는 친구에게 영상 메시지를 보내봐요", media_type: "video", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "친구에게 응원 영상을 보냈어요", is_photo_required: true },
+  { title: "가족 몰래 집 청소하기", description: "가족이 없을 때 깜짝 청소를 해봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족 몰래 집을 깨끗하게 청소했어요", is_photo_required: true },
+  { title: "친구와 오래된 사진 꺼내보기", description: "함께 찍은 오래된 사진을 꺼내 추억을 나눠봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "어디서나", share_copy_template: "친구와 오래된 사진을 꺼내 추억을 나눴어요", is_photo_required: true },
+  { title: "부모님께 발 씻겨드리기", description: "쑥스럽지만 한 번쯤 해드려봐요", media_type: "video", difficulty: "medium", estimated_time: "3분", place_tag: "집", share_copy_template: "부모님께 발을 씻겨드렸어요", is_photo_required: true },
+  { title: "친구에게 좋아하는 노래 추천하기", description: "요즘 내가 푹 빠진 노래를 친구에게 보내봐요", media_type: "photo", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "친구에게 좋아하는 노래를 추천했어요", is_photo_required: true },
+  { title: "가족과 함께 식사 사진 찍기", description: "함께하는 밥상을 사진으로 남겨봐요", media_type: "photo", difficulty: "easy", estimated_time: "1분", place_tag: "집", share_copy_template: "가족과 함께한 밥상을 담았어요", is_photo_required: true },
+  { title: "친구에게 '요즘 어때?' 영상 보내기", description: "문자 말고 목소리로 안부를 물어봐요", media_type: "video", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "친구에게 영상으로 안부를 물었어요", is_photo_required: true },
+  { title: "부모님 어깨 주물러드리기", description: "오늘 5분만 부모님 어깨를 풀어드려봐요", media_type: "video", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "부모님 어깨를 주물러드렸어요", is_photo_required: true },
+  { title: "친구가 좋아하는 음식 사다주기", description: "이유 없이 친구가 좋아하는 걸 사봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "어디서나", share_copy_template: "친구가 좋아하는 음식을 사다줬어요", is_photo_required: true },
+  { title: "가족에게 오늘 하루 어땠는지 물어보기", description: "먼저 관심을 표현하고 반응을 영상으로 남겨봐요", media_type: "video", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "가족에게 먼저 관심을 표현했어요", is_photo_required: true },
+  { title: "오랫동안 못 본 친구에게 먼저 연락하기", description: "오래된 친구에게 먼저 연락해봐요", media_type: "photo", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "오랫동안 못 본 친구에게 먼저 연락했어요", is_photo_required: true },
+  { title: "친구와 함께 웃긴 사진 찍기", description: "오늘 친구와 가장 웃긴 표정으로 찍어봐요", media_type: "photo", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "친구와 웃긴 사진을 찍었어요", is_photo_required: true },
+  { title: "부모님께 '사랑해요' 말하고 반응 찍기", description: "평소에 못 했던 말을 오늘 해봐요", media_type: "video", difficulty: "medium", estimated_time: "1분", place_tag: "집", share_copy_template: "부모님께 사랑한다고 말했어요", is_photo_required: true },
+  { title: "친구의 새 헤어스타일 칭찬하기", description: "변화를 알아채고 말해주는 것만으로도 충분해요", media_type: "video", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "친구의 변화를 알아채고 칭찬했어요", is_photo_required: true },
+  { title: "가족과 보드게임 하기", description: "오늘 저녁 함께 게임 한 판 해봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "가족과 함께 게임을 했어요", is_photo_required: true },
+  { title: "친구에게 직접 그린 그림 선물하기", description: "못 그려도 괜찮아요, 마음이 담기면 돼요", media_type: "photo", difficulty: "medium", estimated_time: "3분", place_tag: "어디서나", share_copy_template: "친구에게 직접 그린 그림을 선물했어요", is_photo_required: true },
+  { title: "부모님 젊을 때 사진 보며 이야기 나누기", description: "부모님의 젊은 시절 이야기를 들어봐요", media_type: "photo", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "부모님 젊은 시절 이야기를 들었어요", is_photo_required: true },
+  { title: "친구와 하늘 같이 바라보기", description: "같은 하늘 아래 있다는 걸 사진으로 나눠봐요", media_type: "photo", difficulty: "easy", estimated_time: "1분", place_tag: "야외", share_copy_template: "친구와 같은 하늘을 바라봤어요", is_photo_required: true },
+  { title: "가족에게 아침 인사 영상 보내기", description: "오늘 아침 가족에게 영상 인사를 보내봐요", media_type: "video", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "가족에게 아침 인사 영상을 보냈어요", is_photo_required: true },
+  { title: "친구와 추억의 장소 다시 방문하기", description: "함께 갔던 곳을 다시 찾아 사진을 찍어봐요", media_type: "photo", difficulty: "medium", estimated_time: "3분", place_tag: "야외", share_copy_template: "친구와 추억의 장소를 다시 찾았어요", is_photo_required: true },
+  { title: "가족 각자의 하루 영상으로 기록하기", description: "오늘 하루 가족의 일상을 짧게 담아봐요", media_type: "video", difficulty: "medium", estimated_time: "3분", place_tag: "집", share_copy_template: "가족의 하루를 영상으로 기록했어요", is_photo_required: true },
+];
+
+/**
+ * category가 'kind'인 액션이 10개 미만일 때만 30개를 업로드한다.
+ */
+export async function runSeedKind(): Promise<void> {
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, 'actions'), where('category', '==', 'kind'), limit(10)),
+    );
+    if (snapshot.size >= 10) {
+      console.log('[seed] kind 액션이 이미 존재합니다. 시딩을 건너뜁니다.');
+      return;
+    }
+
+    console.log('[seed] kind 액션을 시딩합니다...');
+    const docs: SeedAction[] = KIND_ACTIONS.map((a) => ({
+      title: a.title,
+      description: a.description,
+      category: 'kind',
+      difficulty: a.difficulty as Action['difficulty'],
+      estimated_time: parseMinutes(a.estimated_time),
+      place_tag: a.place_tag,
+      is_photo_required: a.is_photo_required,
+      is_active: true,
+      share_copy_template: a.share_copy_template,
+      safety_note: '',
+      media_type: a.media_type,
+    }));
+    await Promise.all(docs.map((d) => addDoc(collection(db, 'actions'), d)));
+    console.log(`[seed] ${docs.length}개 kind 액션 시딩 완료`);
+  } catch (e) {
+    console.error('[seed] runSeedKind error:', e);
+  }
+}
