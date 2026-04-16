@@ -64,8 +64,19 @@ export default function RecordsScreen() {
           style={styles.item}
           activeOpacity={0.75}
         >
-          {record.photo_uploaded && record.photo_url ? (
-            <Image source={{ uri: record.photo_url }} style={styles.thumbnail} resizeMode="cover" />
+          {record.media_url || record.photo_url ? (
+            <View>
+              <Image
+                source={{ uri: record.thumbnail_url ?? record.media_url ?? record.photo_url }}
+                style={styles.thumbnail}
+                resizeMode="cover"
+              />
+              {record.media_type === 'video' && (
+                <View style={styles.videoIcon}>
+                  <Text style={styles.videoIconText}>▶</Text>
+                </View>
+              )}
+            </View>
           ) : (
             <View style={styles.thumbnailPlaceholder} />
           )}
@@ -207,6 +218,18 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     marginRight: Spacing.md,
   },
+  videoIcon: {
+    position: 'absolute',
+    bottom: 3,
+    right: Spacing.md + 3,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoIconText: { fontSize: 8, color: '#fff' },
   thumbnailPlaceholder: {
     width: 60,
     height: 60,

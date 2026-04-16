@@ -224,6 +224,7 @@ export async function runSeedSense(): Promise<void> {
       is_active: true,
       share_copy_template: a.share_copy_template,
       safety_note: '',
+      media_type: 'photo' as const,
     }));
     await Promise.all(docs.map((d) => addDoc(collection(db, 'actions'), d)));
     console.log(`[seed] ${docs.length}개 sense 액션 시딩 완료`);

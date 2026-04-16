@@ -10,7 +10,8 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from './firebase';
 import { Action, DailyRecord } from '../types';
 
 export async function createRecord(data: Omit<DailyRecord, 'record_id'>): Promise<string> {
@@ -100,6 +101,30 @@ export async function getUserStats(
     console.error('getUserStats error:', e);
     return { totalCount: 0, streakDays: 0 };
   }
+}
+
+/**
+ * 사진 또는 영상을 Firebase Storage에 업로드하고 URL을 반환한다.
+ * - 사진: photos/{userId}/{recordId}.jpg
+ * - 영상: videos/{userId}/{recordId}.mp4  (thumbnailUrl은 추후 별도 생성)
+ */
+export async function uploadMedia(
+  userId: string,
+  recordId: string,
+  uri: string,
+  mediaType: 'photo' | 'video',
+): Promise<{ url: string; thumbnailUrl: string }> {
+  const response = await fetch(uri);
+  const blob = await response.blob();
+  const path =
+    mediaType === 'photo'
+      ? `photos/${userId}/${recordId}.jpg`
+      : `videos/${userId}/${recordId}.mp4`;
+  const metadata = { contentType: mediaType === 'photo' ? 'image/jpeg' : 'video/mp4' };
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, blob, metadata);
+  const url = await getDownloadURL(storageRef);
+  return { url, thumbnailUrl: url };
 }
 
 /**

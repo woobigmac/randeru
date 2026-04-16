@@ -67,3 +67,11 @@ export const ADMOB_BANNER_AD_UNIT_ID = Platform.select({
 }) as string;
 
 export const APP_VERSION = '1.0.0';
+
+export const MediaType = {
+  PHOTO: 'photo',
+  VIDEO: 'video',
+  BOTH: 'both',
+} as const;
+
+export const MAX_VIDEO_DURATION = 15; // 초

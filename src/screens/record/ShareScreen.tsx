@@ -32,21 +32,29 @@ type Props = {
 const SHARE_HASHTAGS = '#랜데루 #오늘의인간다움 #하루한번작은행동';
 
 // ─── 공유 카드 ──────────────────────────────────────────────────────────────
-type ShareCardProps = { title: string; copyTemplate: string; photoUrl?: string };
+type ShareCardProps = {
+  title: string;
+  copyTemplate: string;
+  mediaUrl?: string;
+  mediaType?: 'photo' | 'video';
+};
 
 const ShareCard = React.forwardRef<ViewShot, ShareCardProps>(
-  ({ title, copyTemplate, photoUrl }, ref) => (
+  ({ title, copyTemplate, mediaUrl, mediaType }, ref) => (
     <ViewShot ref={ref} options={{ format: 'jpg', quality: 0.95 }}>
       <View style={cardStyles.card}>
-        {photoUrl ? (
-          <Image
-            source={{ uri: photoUrl }}
-            style={cardStyles.photo}
-            resizeMode="cover"
-          />
+        {mediaUrl ? (
+          <View style={{ position: 'relative' }}>
+            <Image source={{ uri: mediaUrl }} style={cardStyles.photo} resizeMode="cover" />
+            {mediaType === 'video' && (
+              <View style={cardStyles.videoBadge}>
+                <Text style={cardStyles.videoBadgeText}>영상</Text>
+              </View>
+            )}
+          </View>
         ) : (
           <View style={cardStyles.photoPlaceholder}>
-            <Text style={{ fontSize: 13, color: Colors.textTertiary }}>사진 없음</Text>
+            <Text style={{ fontSize: 13, color: Colors.textTertiary }}>미디어 없음</Text>
           </View>
         )}
         <Text style={cardStyles.title}>{title}</Text>
@@ -76,6 +84,16 @@ const cardStyles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: Spacing.md,
   },
+  videoBadge: {
+    position: 'absolute',
+    bottom: Spacing.sm + Spacing.md,
+    right: Spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: Radius.sm,
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+  },
+  videoBadgeText: { fontSize: 11, color: '#fff', fontWeight: '600' },
   title: {
     fontFamily: Fonts.handwriting,
     fontSize: 18,
@@ -199,7 +217,8 @@ export default function ShareScreen({ navigation, route }: Props) {
             ref={cardRef}
             title={action.title}
             copyTemplate={action.share_copy_template}
-            photoUrl={record.photo_url}
+            mediaUrl={record.thumbnail_url ?? record.media_url ?? record.photo_url}
+            mediaType={record.media_type}
           />
         </View>
 

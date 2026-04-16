@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Image, ScrollView, StyleSheet } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
@@ -30,12 +31,25 @@ export default function RecordDetailScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.container}>
       <Header title={formatDate(record.action_date)} showBack />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* 사진 */}
-        {record.photo_uploaded && record.photo_url ? (
-          <Image source={{ uri: record.photo_url }} style={styles.photo} resizeMode="cover" />
+        {/* 미디어 */}
+        {record.media_type === 'video' && record.media_url ? (
+          <Video
+            source={{ uri: record.media_url }}
+            style={styles.photo}
+            resizeMode={ResizeMode.COVER}
+            useNativeControls
+            isLooping
+            shouldPlay
+          />
+        ) : record.media_url || record.photo_url ? (
+          <Image
+            source={{ uri: record.media_url ?? record.photo_url }}
+            style={styles.photo}
+            resizeMode="cover"
+          />
         ) : (
           <View style={styles.photoPlaceholder}>
-            <Text style={styles.photoPlaceholderText}>사진 없음</Text>
+            <Text style={styles.photoPlaceholderText}>미디어 없음</Text>
           </View>
         )}
 

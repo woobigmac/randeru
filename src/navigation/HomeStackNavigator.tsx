@@ -10,7 +10,7 @@ import ShareScreen from '../screens/record/ShareScreen';
 export type HomeStackParamList = {
   Home: undefined;
   ActionDetail: { action: Action };
-  Photo: { recordId: string };
+  Photo: { recordId: string; action: Action };
   Complete: { recordId: string };
   Share: { record: DailyRecord; action: Action };
 };

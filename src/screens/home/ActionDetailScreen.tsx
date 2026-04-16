@@ -76,7 +76,7 @@ export default function ActionDetailScreen({ navigation, route }: Props) {
           label="이 액션 시작하기"
           onPress={() => {
             if (todayRecord) {
-              navigation.navigate('Photo', { recordId: todayRecord.record_id });
+              navigation.navigate('Photo', { recordId: todayRecord.record_id, action });
             }
           }}
           disabled={!todayRecord}
