@@ -50,20 +50,17 @@ export const HASHTAGS: Record<string, string[]> = {
 };
 
 // ─── AdMob 광고 단위 ID ────────────────────────────────────────────────────────
-// 현재는 Google 공식 테스트 ID. 앱 출시 전 실제 ID로 교체 필요.
-// iOS 실제 ID:     ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY
-// Android 실제 ID: ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY
 
 export const ADMOB_REWARDED_AD_UNIT_ID = Platform.select({
-  ios: 'ca-app-pub-3940256099942544/1712485313',      // 테스트 ID
-  android: 'ca-app-pub-3940256099942544/5224354917',  // 테스트 ID
-  default: 'ca-app-pub-3940256099942544/5224354917',
+  ios: 'ca-app-pub-5402672709504975/7787411749',
+  android: 'ca-app-pub-5402672709504975/2535085062',
+  default: 'ca-app-pub-5402672709504975/2535085062',
 }) as string;
 
 export const ADMOB_BANNER_AD_UNIT_ID = Platform.select({
-  ios: 'ca-app-pub-3940256099942544/2934735716',      // 테스트 ID
-  android: 'ca-app-pub-3940256099942544/6300978111',  // 테스트 ID
-  default: 'ca-app-pub-3940256099942544/6300978111',
+  ios: 'ca-app-pub-5402672709504975/2831658029',
+  android: 'ca-app-pub-5402672709504975/8742248224',
+  default: 'ca-app-pub-5402672709504975/8742248224',
 }) as string;
 
 export const APP_VERSION = '1.0.0';
