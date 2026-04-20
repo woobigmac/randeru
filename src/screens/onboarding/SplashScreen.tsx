@@ -5,21 +5,23 @@ import { useUserStore } from '../../store/useUserStore';
 import { registerPushToken } from '../../services/notificationService';
 import { Colors, Fonts } from '../../constants/theme';
 
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 export default function SplashScreen() {
   const loadUser = useUserStore((state) => state.loadUser);
 
   useEffect(() => {
     const init = async () => {
-      // 1. 유저 정보 로드
-      await loadUser();
+      // 유저 로드와 최소 2500ms 대기를 병렬 실행 — 둘 다 끝나야 진행
+      await Promise.all([loadUser(), delay(2500)]);
 
-      // 2. 온보딩 완료 유저라면 push token 등록 (실패해도 계속 진행)
+      // 온보딩 완료 유저라면 push token 등록 (실패해도 계속 진행)
       const { user, isOnboardingComplete } = useUserStore.getState();
       if (isOnboardingComplete && user?.user_id) {
-        await registerPushToken(user.user_id);
+        registerPushToken(user.user_id).catch(() => {});
       }
 
-      // 3. isOnboardingComplete에 따라 RootNavigator가 자동 분기
+      // isOnboardingComplete에 따라 RootNavigator가 자동 분기
     };
 
     init();
