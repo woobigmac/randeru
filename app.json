@@ -44,6 +44,15 @@
           "iosAppId": "ca-app-pub-5402672709504975~8734721397"
         }
       ],
+      [
+        "@react-native-kakao/core",
+        {
+          "nativeAppKey": "38af48f8408ef36fd12150013a3f03ea",
+          "ios": {
+            "handleKakaoOpenUrl": true
+          }
+        }
+      ],
       "expo-font"
     ]
   }

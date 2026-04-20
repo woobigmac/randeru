@@ -3,6 +3,9 @@ import { Tone } from '../types';
 
 export const MAX_RESHUFFLE_COUNT = 3;
 
+export const MIN_AGE = 10;
+export const MAX_AGE = 100;
+
 export const DEFAULT_PUSH_TIME = '09:00';
 
 export const TONES: { id: Tone; label: string; description: string }[] = [

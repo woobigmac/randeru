@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { loginWithKakao as kakaoLogin, logoutKakao, unlinkKakao } from '../services/authService';
 import { User, Tone } from '../types';
 import { DEFAULT_PUSH_TIME } from '../constants';
 
@@ -12,11 +15,17 @@ const generateUserId = (): string =>
 interface UserState {
   user: User | null;
   isOnboardingComplete: boolean;
+  isLoggedIn: boolean;
   isLoading: boolean;
 
   loadUser: () => Promise<void>;
+  loginWithKakao: () => Promise<{ isNewUser: boolean }>;
+  loginAsGuest: () => Promise<void>;
+  logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   setNickname: (nickname: string) => Promise<void>;
   setSelectedTones: (tones: Tone[]) => Promise<void>;
+  setAge: (age: number) => Promise<void>;
   setPushSettings: (enabled: boolean, time: string) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   clearUser: () => Promise<void>;
@@ -25,6 +34,7 @@ interface UserState {
 export const useUserStore = create<UserState>((set, get) => ({
   user: null,
   isOnboardingComplete: false,
+  isLoggedIn: false,
   isLoading: true,
 
   loadUser: async () => {
@@ -37,7 +47,8 @@ export const useUserStore = create<UserState>((set, get) => ({
 
       const user = userJson ? (JSON.parse(userJson) as User) : null;
       const isOnboardingComplete = onboardingFlag === 'true';
-      set({ user, isOnboardingComplete });
+      const isLoggedIn = !!user;
+      set({ user, isOnboardingComplete, isLoggedIn });
     } catch (e) {
       console.error('loadUser error:', e);
     } finally {
@@ -45,15 +56,102 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
+  loginWithKakao: async () => {
+    const { kakaoId, nickname, profileImage } = await kakaoLogin();
+    const docId = `kakao_${kakaoId}`;
+    const docRef = doc(db, 'users', docId);
+    const docSnap = await getDoc(docRef);
+
+    let user: User;
+    let isNewUser: boolean;
+
+    if (docSnap.exists()) {
+      // 기존 유저 — Firestore 데이터 복원
+      user = docSnap.data() as User;
+      isNewUser = false;
+    } else {
+      // 신규 유저 생성
+      user = {
+        user_id: docId,
+        nickname,
+        kakaoId,
+        profileImage,
+        loginType: 'kakao',
+        selected_tones: [],
+        push_enabled: true,
+        push_time: DEFAULT_PUSH_TIME,
+        created_at: new Date(),
+        age: 20,
+      };
+      await setDoc(docRef, user);
+      isNewUser = true;
+    }
+
+    await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+    if (!isNewUser) {
+      await AsyncStorage.setItem(STORAGE_KEY_ONBOARDING, 'true');
+    }
+
+    set({
+      user,
+      isLoggedIn: true,
+      isOnboardingComplete: !isNewUser,
+    });
+
+    return { isNewUser };
+  },
+
+  loginAsGuest: async () => {
+    const user: User = {
+      user_id: generateUserId(),
+      nickname: '게스트',
+      loginType: 'guest',
+      selected_tones: [],
+      push_enabled: true,
+      push_time: DEFAULT_PUSH_TIME,
+      created_at: new Date(),
+      age: 20,
+    };
+
+    await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+    set({ user, isLoggedIn: true, isOnboardingComplete: false });
+  },
+
+  logout: async () => {
+    const { user } = get();
+    if (user?.loginType === 'kakao') {
+      try {
+        await logoutKakao();
+      } catch (e) {
+        console.warn('logoutKakao error:', e);
+      }
+    }
+    await get().clearUser();
+  },
+
+  deleteAccount: async () => {
+    const { user } = get();
+    if (user?.loginType === 'kakao') {
+      try {
+        await unlinkKakao();
+      } catch (e) {
+        console.warn('unlinkKakao error:', e);
+      }
+    }
+    await get().clearUser();
+  },
+
   setNickname: async (nickname) => {
     const currentUser = get().user;
     const user: User = currentUser ?? {
       user_id: generateUserId(),
       nickname,
+      loginType: 'guest',
       selected_tones: [],
       push_enabled: true,
       push_time: DEFAULT_PUSH_TIME,
       created_at: new Date(),
+      age: 20,
     };
     const updated = { ...user, nickname };
     set({ user: updated });
@@ -73,6 +171,18 @@ export const useUserStore = create<UserState>((set, get) => ({
       await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
     } catch (e) {
       console.error('setSelectedTones save error:', e);
+    }
+  },
+
+  setAge: async (age) => {
+    const currentUser = get().user;
+    if (!currentUser) return;
+    const updated = { ...currentUser, age };
+    set({ user: updated });
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
+    } catch (e) {
+      console.error('setAge save error:', e);
     }
   },
 
@@ -98,7 +208,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   clearUser: async () => {
-    set({ user: null, isOnboardingComplete: false });
+    set({ user: null, isOnboardingComplete: false, isLoggedIn: false });
     try {
       await AsyncStorage.multiRemove([STORAGE_KEY_USER, STORAGE_KEY_ONBOARDING]);
     } catch (e) {

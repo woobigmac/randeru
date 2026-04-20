@@ -26,7 +26,8 @@ const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9]{2,10}$/;
 export default function SettingScreen({ navigation }: Props) {
   const user = useUserStore((s) => s.user);
   const setNickname = useUserStore((s) => s.setNickname);
-  const clearUser = useUserStore((s) => s.clearUser);
+  const logout = useUserStore((s) => s.logout);
+  const deleteAccount = useUserStore((s) => s.deleteAccount);
 
   const handleEditNickname = () => {
     if (Platform.OS === 'ios') {
@@ -51,6 +52,27 @@ export default function SettingScreen({ navigation }: Props) {
     }
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      '로그아웃',
+      '로그아웃하시겠어요?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '로그아웃',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (e) {
+              console.warn('logout error:', e);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handleDeleteAccount = () => {
     Alert.alert(
       '탈퇴하기',
@@ -62,11 +84,13 @@ export default function SettingScreen({ navigation }: Props) {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (user?.user_id) await deleteDoc(doc(db, 'users', user.user_id));
+              if (user?.loginType === 'kakao' && user?.user_id) {
+                await deleteDoc(doc(db, 'users', user.user_id));
+              }
             } catch (e) {
               console.warn('deleteDoc error:', e);
             } finally {
-              await clearUser();
+              await deleteAccount();
             }
           },
         },
@@ -83,6 +107,7 @@ export default function SettingScreen({ navigation }: Props) {
           <SettingItem label="이용약관" onPress={() => Alert.alert('준비 중', '준비 중입니다.')} />
           <SettingItem label="개인정보처리방침" onPress={() => Alert.alert('준비 중', '준비 중입니다.')} />
           <SettingItem label={`앱 버전 ${APP_VERSION}`} isStatic />
+          <SettingItem label="로그아웃" onPress={handleLogout} isDanger />
           <SettingItem label="탈퇴하기" onPress={handleDeleteAccount} isDanger />
         </View>
       </ScrollView>

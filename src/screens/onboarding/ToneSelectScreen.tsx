@@ -8,23 +8,24 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { TONES } from '../../constants';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 import { Tone } from '../../types';
 import { useUserStore } from '../../store/useUserStore';
 import { Button } from '../../components/Button';
-import {
-  requestPermission,
-  scheduleDailyNotification,
-  registerPushToken,
-} from '../../services/notificationService';
+import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - Spacing.lg * 2 - Spacing.sm) / 2;
 
-export default function ToneSelectScreen() {
+type Props = {
+  navigation: StackNavigationProp<OnboardingStackParamList, 'ToneSelect'>;
+};
+
+export default function ToneSelectScreen({ navigation }: Props) {
   const [selectedTones, setSelectedTones] = useState<Tone[]>([]);
-  const { user, setSelectedTones: saveToStore, completeOnboarding } = useUserStore();
+  const { setSelectedTones: saveToStore } = useUserStore();
 
   const toggleTone = (tone: Tone) => {
     setSelectedTones((prev) =>
@@ -32,20 +33,9 @@ export default function ToneSelectScreen() {
     );
   };
 
-  const handleComplete = async () => {
+  const handleNext = async () => {
     await saveToStore(selectedTones);
-    await completeOnboarding();
-
-    // 온보딩 완료 후 알림 초기화 (실패해도 앱 진입은 계속)
-    const userId = useUserStore.getState().user?.user_id ?? user?.user_id;
-    const granted = await requestPermission();
-    if (granted) {
-      await scheduleDailyNotification('09:00');
-    }
-    if (userId) {
-      await registerPushToken(userId);
-    }
-    // isOnboardingComplete가 true로 바뀌면 RootNavigator가 자동으로 Main으로 전환
+    navigation.navigate('AgeSelect');
   };
 
   return (
@@ -82,8 +72,8 @@ export default function ToneSelectScreen() {
 
       <View style={styles.buttonArea}>
         <Button
-          label={selectedTones.length === 0 ? '전체 랜덤으로 받기' : '오늘의 액션 받기'}
-          onPress={handleComplete}
+          label="다음"
+          onPress={handleNext}
         />
       </View>
     </SafeAreaView>

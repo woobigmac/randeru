@@ -9,6 +9,10 @@ export interface User {
   push_enabled: boolean;
   push_time: string; // 'HH:MM' format
   created_at: Date;
+  age: number;
+  loginType: 'kakao' | 'apple' | 'guest';
+  kakaoId?: string;
+  profileImage?: string;
 }
 
 export interface Action {
