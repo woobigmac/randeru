@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, limit, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, query, limit, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { Action } from '../types';
 
@@ -411,49 +411,53 @@ type SeedEnvironmentInput = {
 };
 
 const ENVIRONMENT_ACTIONS: SeedEnvironmentInput[] = [
-  { title: "길가 쓰레기 하나 줍기", description: "지구가 조금 깨끗해졌어요", difficulty: "easy", estimated_time: "1분", place_tag: "야외", share_copy_template: "오늘 지구를 조금 깨끗하게 만들었어요" },
-  { title: "분리수거 꼼꼼히 하기", description: "지구가 제자리를 찾았어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 지구가 제자리를 찾도록 도왔어요" },
-  { title: "텀블러 들고 나가기", description: "바다가 오늘 하루 조금 더 맑아졌어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "오늘 바다를 조금 더 맑게 만들었어요" },
-  { title: "장바구니 챙겨서 장보기", description: "비닐봉지 하나가 줄어들었어요", difficulty: "easy", estimated_time: "2분", place_tag: "마트", share_copy_template: "오늘 비닐봉지 하나를 줄였어요" },
-  { title: "공원 쓰레기 3개 줍기", description: "공원이 오늘 숨을 조금 더 쉬었어요", difficulty: "easy", estimated_time: "3분", place_tag: "야외", share_copy_template: "오늘 공원이 숨을 더 쉴 수 있게 도왔어요" },
-  { title: "안 쓰는 콘센트 뽑기", description: "지구가 잠깐 쉬어갈 수 있어요", difficulty: "easy", estimated_time: "1분", place_tag: "집", share_copy_template: "오늘 지구가 잠깐 쉬어갈 수 있게 했어요" },
-  { title: "오늘 하루 엘리베이터 대신 계단 이용하기", description: "내 다리도, 지구도 함께 건강해졌어요", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "오늘 나도 지구도 함께 건강해졌어요" },
-  { title: "음식 남기지 않고 다 먹기", description: "누군가 공들인 것들이 낭비되지 않았어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "오늘 음식을 하나도 낭비하지 않았어요" },
-  { title: "오늘 하루 일회용품 안 쓰기", description: "플라스틱 하나가 바다로 가지 않았어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "오늘 플라스틱 하나가 바다로 가지 않았어요" },
-  { title: "화단에 물 주기", description: "목말랐던 꽃이 오늘 물을 마셨어요", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나", share_copy_template: "오늘 목말랐던 꽃에게 물을 줬어요" },
-  { title: "오늘 하루 대중교통 이용하기", description: "도로가 오늘 조금 더 한가해졌어요", difficulty: "easy", estimated_time: "2분", place_tag: "야외", share_copy_template: "오늘 도로를 조금 더 한가하게 만들었어요" },
-  { title: "빈 병 깨끗이 씻어 분리수거하기", description: "유리가 다시 유리가 될 준비를 했어요", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "오늘 유리가 다시 태어날 준비를 도왔어요" },
-  { title: "에코백 들고 나가기", description: "비닐봉지 한 장이 태어나지 않았어요", difficulty: "easy", estimated_time: "1분", place_tag: "야외", share_copy_template: "오늘 비닐봉지 한 장이 태어나지 않았어요" },
-  { title: "오늘 하루 자전거 타기", description: "바람이 오늘 기름 냄새를 맡지 않았어요", difficulty: "easy", estimated_time: "3분", place_tag: "야외", share_copy_template: "오늘 바람이 기름 냄새를 맡지 않았어요" },
-  { title: "집 안 공기 환기하기", description: "집이 오늘 깊은 숨을 쉬었어요", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "오늘 집이 깊은 숨을 쉬었어요" },
-  { title: "오늘 하루 종이컵 안 쓰기", description: "나무 한 그루가 조금 더 자랄 수 있어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "오늘 나무 한 그루가 조금 더 자랄 수 있게 했어요" },
-  { title: "작은 화분 하나 키우기 시작하기", description: "새로운 초록 친구가 생겼어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 새로운 초록 친구가 생겼어요" },
-  { title: "오늘 하루 걸어서 출퇴근하기", description: "하늘이 오늘 조금 더 파래졌어요", difficulty: "easy", estimated_time: "3분", place_tag: "야외", share_copy_template: "오늘 하늘이 조금 더 파래졌어요" },
-  { title: "손수건 사용해보기", description: "물티슈 한 장이 쓰레기가 되지 않았어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나", share_copy_template: "오늘 물티슈 한 장이 쓰레기가 되지 않았어요" },
-  { title: "엄마 도와서 청소하기", description: "집이 오늘 환하게 웃었어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 집이 환하게 웃었어요" },
-  { title: "설거지 도와주기", description: "부엌이 오늘 홀가분해졌어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 부엌이 홀가분해졌어요" },
-  { title: "저녁식사 후 식탁 정리 도와주기", description: "하루의 마무리가 깔끔해졌어요", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "오늘 하루의 마무리가 깔끔해졌어요" },
-  { title: "친구 책상 청소해주기", description: "친구의 공간이 오늘 숨을 쉬었어요", difficulty: "easy", estimated_time: "3분", place_tag: "어디서나", share_copy_template: "오늘 친구의 공간이 숨을 쉬었어요" },
-  { title: "옷 정리하기", description: "옷들이 드디어 제자리를 찾았어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 옷들이 드디어 제자리를 찾았어요" },
-  { title: "내 방 책상 정리하기", description: "내 공간이 오늘 맑아졌어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 내 공간이 맑아졌어요" },
-  { title: "아빠 엄마 도와 분리수거하기", description: "가족이 함께 지구를 돌봤어요", difficulty: "easy", estimated_time: "3분", place_tag: "집", share_copy_template: "오늘 가족이 함께 지구를 돌봤어요" },
-  { title: "음식물 쓰레기 버리고 오기", description: "집이 오늘 조금 더 가벼워졌어요", difficulty: "easy", estimated_time: "2분", place_tag: "집", share_copy_template: "오늘 집이 조금 더 가벼워졌어요" },
+  { title: "길가 쓰레기 하나 줍기", description: "지구가 조금 깨끗해졌어요", share_copy_template: "오늘 지구를 조금 깨끗하게 만들었어요", difficulty: "easy", estimated_time: "1분", place_tag: "야외" },
+  { title: "분리수거 꼼꼼히 하기", description: "작은 실천이 환경을 깨끗하게 만들어요", share_copy_template: "작은 행동이 모여 큰 변화를 만들어요", difficulty: "easy", estimated_time: "3분", place_tag: "집" },
+  { title: "텀블러 들고 나가기", description: "바다가 오늘 하루 조금 더 맑아졌어요", share_copy_template: "오늘 바다를 조금 더 맑게 만들었어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나" },
+  { title: "장바구니 챙겨서 장보기", description: "장바구니는 생각보다 이쁘다구요!", share_copy_template: "장바구니 귀엽지 않나요?", difficulty: "easy", estimated_time: "2분", place_tag: "마트" },
+  { title: "공원 쓰레기 하나 줍기", description: "버린 사람 벌 받아랏", share_copy_template: "우리집 앞 공원이 깨끗해졌어요", difficulty: "easy", estimated_time: "3분", place_tag: "야외" },
+  { title: "안 쓰는 콘센트 뽑기", description: "지구가 잠깐 쉬어갈 수 있어요", share_copy_template: "오늘 지구가 잠깐 쉬어갈 수 있게 했어요", difficulty: "easy", estimated_time: "1분", place_tag: "집" },
+  { title: "오늘 하루 엘리베이터 대신 계단 이용하기", description: "내 다리도, 지구도 함께 건강해졌어요", share_copy_template: "오늘 내 다리도, 지구도 함께 건강해졌어요", difficulty: "easy", estimated_time: "2분", place_tag: "어디서나" },
+  { title: "음식 남기지 않고 다 먹기", description: "당근, 오이 남기지 마세요!", share_copy_template: "오늘 음식을 하나도 낭비하지 않았어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나" },
+  { title: "오늘 하루 일회용품 안 쓰기", description: "생각보다 어려워요!", share_copy_template: "오늘 하루 일회용품을 한번도 쓰지 않았어요", difficulty: "medium", estimated_time: "1분", place_tag: "어디서나" },
+  { title: "화단에 물 주기", description: "식물을 가꾸는건 보람찬 일이에요", share_copy_template: "오늘 꽃에게 물을 줬어요", difficulty: "medium", estimated_time: "2분", place_tag: "어디서나" },
+  { title: "오늘 하루 대중교통 이용하기", description: "도로가 오늘 조금 더 한가해졌어요", share_copy_template: "오늘 도로를 조금 더 한가하게 만들었어요", difficulty: "easy", estimated_time: "2분", place_tag: "야외" },
+  { title: "빈 병 깨끗이 씻어 분리수거하기", description: "빈 병은 20회 이상 재사용 가능하다는거 알고 있나요?", share_copy_template: "빈 병을 깨끗이 씻어서 재활용 했어요", difficulty: "easy", estimated_time: "2분", place_tag: "집" },
+  { title: "에코백 들고 나가기", description: "장원영도 에코백을 쓴다구요", share_copy_template: "장원영도 에코백 쓰는데 우리도 쓰자구요", difficulty: "easy", estimated_time: "1분", place_tag: "야외" },
+  { title: "오늘 하루 자전거 타기", description: "상쾌한 바람도 느끼고 환경도 지켜요", share_copy_template: "나랑 자전거 타러 가지 않을래?", difficulty: "easy", estimated_time: "3분", place_tag: "야외" },
+  { title: "집 안 공기 환기하기", description: "맑은 공기는 기분을 좋게 해줘요", share_copy_template: "집을 상쾌한 공기로 가득 채웠어요", difficulty: "easy", estimated_time: "2분", place_tag: "집" },
+  { title: "오늘 하루 종이컵 안 쓰기", description: "종이컵만 안써도 나무를 심는 효과가 있대요!", share_copy_template: "오늘 하루 종이컵 없이 생활했어요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나" },
+  { title: "작은 화분 하나 키우기 시작하기", description: "새로운 초록 친구에게 이름을 지어줘볼까요?", share_copy_template: "오늘 새로운 초록 친구가 생겼어요", difficulty: "easy", estimated_time: "3분", place_tag: "집" },
+  { title: "오늘 하루 걸어서 이동하기", description: "천천히 걸으며 풍경을 봐요", share_copy_template: "오늘 몇 걸음까지 걸어봤나요?", difficulty: "easy", estimated_time: "3분", place_tag: "야외" },
+  { title: "손수건 사용해보기", description: "옛날부터 손수건은 낭만의 아이콘이라구요", share_copy_template: "내 손수건 귀엽지 않나요", difficulty: "easy", estimated_time: "1분", place_tag: "어디서나" },
+  { title: "엄마 도와서 청소하기", description: "엄마도 집도 오늘 환하게 웃었어요", share_copy_template: "내 청소 실력 어때요", difficulty: "easy", estimated_time: "3분", place_tag: "집" },
+  { title: "설거지 도와주기", description: "엄마, 아빠가 놀랄 수도 있어요", share_copy_template: "뽀드득 내 설거지 실력 어때요", difficulty: "easy", estimated_time: "3분", place_tag: "집" },
+  { title: "저녁식사 후 식탁 정리 도와주기", description: "엄마, 아빠가 놀랄 수도 있어요", share_copy_template: "엄마, 아빠가 놀랐어요", difficulty: "easy", estimated_time: "2분", place_tag: "집" },
+  { title: "친구 책상 청소해주기", description: "친구가 당황해 할 수도 있어요", share_copy_template: "친구야, 다 너를 위한 일이야", difficulty: "easy", estimated_time: "3분", place_tag: "어디서나" },
+  { title: "옷 정리하기", description: "솔직히 미뤄왔죠? 오늘 바로 해봐요", share_copy_template: "옷 정리 끝! (새 옷 사야지)", difficulty: "easy", estimated_time: "3분", place_tag: "집" },
+  { title: "내 방 책상 정리하기", description: "솔직히 미뤄왔죠? 오늘 바로 해봐요", share_copy_template: "시험기간도 아닌데 책상 정리를 했어요", difficulty: "easy", estimated_time: "3분", place_tag: "집" },
+  { title: "아빠 엄마 도와 분리수거하기", description: "엄마, 아빠가 놀랄 수도 있어요", share_copy_template: "내가 한 우리집 분리수거, 어때요?", difficulty: "easy", estimated_time: "3분", place_tag: "집" },
+  { title: "음식물 쓰레기 버리고 오기", description: "아빠가 제일 싫어하는 음쓰 버리기, 내가 해봐요", share_copy_template: "아빠가 왜 싫어하는지 알겠어요", difficulty: "easy", estimated_time: "2분", place_tag: "집" },
 ];
 
 /**
- * category가 'environment'인 액션이 10개 미만일 때만 27개를 업로드한다.
+ * 기존 'environment' 액션을 전체 삭제하고 새 데이터 27개를 삽입한다.
+ * (데이터 교체용 — 항상 삭제 후 재삽입)
  */
 export async function runSeedEnvironment(): Promise<void> {
   try {
-    const snapshot = await getDocs(
-      query(collection(db, 'actions'), where('category', '==', 'environment'), limit(10)),
+    // 1. 기존 environment 문서 전체 조회 후 삭제
+    const existing = await getDocs(
+      query(collection(db, 'actions'), where('category', '==', 'environment')),
     );
-    if (snapshot.size >= 10) {
-      console.log('[seed] environment 액션이 이미 존재합니다. 시딩을 건너뜁니다.');
-      return;
+    if (existing.size > 0) {
+      console.log(`[seed] 기존 environment 액션 ${existing.size}개 삭제 중...`);
+      await Promise.all(existing.docs.map((d) => deleteDoc(d.ref)));
+      console.log('[seed] 기존 environment 액션 삭제 완료');
     }
 
-    console.log('[seed] environment 액션을 시딩합니다...');
+    // 2. 새 데이터 삽입
+    console.log('[seed] 새 environment 액션을 시딩합니다...');
     const docs: SeedAction[] = ENVIRONMENT_ACTIONS.map((a) => ({
       title: a.title,
       description: a.description,
