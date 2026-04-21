@@ -1,6 +1,6 @@
 const { withAppDelegate, withInfoPlist } = require('expo/config-plugins');
 
-const KAKAO_APP_KEY = '38af48f8408ef36fd12150013a3f03ea';
+const KAKAO_APP_KEY = '8ce0538653d5ba86b44650f62694d0a9';
 
 /**
  * KakaoSDK.initSDK()를 AppDelegate.swift에 추가합니다.
