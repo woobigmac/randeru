@@ -45,7 +45,16 @@ export const useUserStore = create<UserState>((set, get) => ({
         AsyncStorage.getItem(STORAGE_KEY_ONBOARDING),
       ]);
 
-      const user = userJson ? (JSON.parse(userJson) as User) : null;
+      const parsed = userJson ? (JSON.parse(userJson) as User) : null;
+
+      // loginType이 없는 구버전 데이터는 로그인 안 된 상태로 처리하고 초기화
+      if (parsed && !parsed.loginType) {
+        await AsyncStorage.multiRemove([STORAGE_KEY_USER, STORAGE_KEY_ONBOARDING]);
+        set({ user: null, isOnboardingComplete: false, isLoggedIn: false });
+        return;
+      }
+
+      const user = parsed;
       const isOnboardingComplete = onboardingFlag === 'true';
       const isLoggedIn = !!user;
       set({ user, isOnboardingComplete, isLoggedIn });
