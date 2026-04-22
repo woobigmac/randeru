@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserStore } from '../../store/useUserStore';
+import { logLogin } from '../../services/analyticsService';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 
 export default function LoginScreen() {
@@ -21,7 +22,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       await loginWithKakao();
-      // RootNavigator가 isLoggedIn 변경을 감지해 자동 라우팅
+      logLogin('kakao');
     } catch (e: unknown) {
       const message =
         e instanceof Error ? e.message : '카카오 로그인에 실패했어요.';
@@ -35,6 +36,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       await loginAsGuest();
+      logLogin('guest');
     } catch (e) {
       console.error('guest login error:', e);
     } finally {

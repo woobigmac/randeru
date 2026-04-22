@@ -14,6 +14,7 @@ import { Colors, Fonts, Spacing } from '../../constants/theme';
 import { MIN_AGE, MAX_AGE } from '../../constants';
 import { useUserStore } from '../../store/useUserStore';
 import { registerPushToken } from '../../services/notificationService';
+import { logOnboardingComplete } from '../../services/analyticsService';
 import { Button } from '../../components/Button';
 import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 
@@ -47,6 +48,7 @@ export default function AgeSelectScreen({ navigation }: Props) {
   const handleComplete = async () => {
     await setAge(selectedAge);
     await completeOnboarding();
+    logOnboardingComplete(selectedAge, user?.selected_tones ?? []);
     if (user?.user_id) {
       registerPushToken(user.user_id).catch(() => {});
     }

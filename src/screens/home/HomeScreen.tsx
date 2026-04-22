@@ -16,6 +16,8 @@ import { useRecordStore } from '../../store/useRecordStore';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { MainTabParamList } from '../../navigation/MainTabNavigator';
 import { MAX_RESHUFFLE_COUNT, FREE_RESHUFFLE_COUNT } from '../../constants';
+import { logActionReceived, logActionAccepted, logReshuffle } from '../../services/analyticsService';
+import { useActionStore as useActionStoreRaw } from '../../store/useActionStore';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 import { ActionCard } from '../../components/ActionCard';
 import { Button } from '../../components/Button';
@@ -56,6 +58,16 @@ export default function HomeScreen({ navigation }: Props) {
   const isAdAvailable = reshuffleCount >= FREE_RESHUFFLE_COUNT && reshuffleCount < MAX_RESHUFFLE_COUNT;
   const isExhausted = reshuffleCount >= MAX_RESHUFFLE_COUNT;
 
+  const handleReceiveAction = async () => {
+    if (!user) return;
+    await receiveAction(user.user_id, user.selected_tones);
+    const received = useActionStoreRaw.getState().todayAction;
+    if (received) {
+      logActionReceived(received.action_id, received.category);
+      logActionAccepted(received.action_id, received.category);
+    }
+  };
+
   const reshuffleLabel = isFreeAvailable
     ? `다른 액션 보기 (${FREE_RESHUFFLE_COUNT - reshuffleCount}회 남음)`
     : isAdAvailable
@@ -71,12 +83,19 @@ export default function HomeScreen({ navigation }: Props) {
         '무료 재추첨을 모두 사용했어요.\n짧은 광고를 보면 1회 더 뽑을 수 있어요!',
         [
           { text: '괜찮아요', style: 'cancel' },
-          { text: '광고 보고 뽑기', onPress: () => reshuffleWithAd(user.user_id) },
+          {
+            text: '광고 보고 뽑기',
+            onPress: () => {
+              logReshuffle(reshuffleCount, true);
+              reshuffleWithAd(user.user_id);
+            },
+          },
         ],
       );
       return;
     }
 
+    logReshuffle(reshuffleCount, false);
     reshuffleAction(user.user_id);
   };
 
@@ -134,7 +153,7 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
           <Button
             label="오늘의 액션 뽑기"
-            onPress={() => user && receiveAction(user.user_id, user.selected_tones)}
+            onPress={handleReceiveAction}
             style={styles.mainButton}
           />
         </View>

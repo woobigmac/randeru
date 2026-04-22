@@ -24,6 +24,7 @@ import { MAX_VIDEO_DURATION } from '../../constants';
 import { Header } from '../../components/Header';
 import { Button } from '../../components/Button';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
+import { logActionCompleted } from '../../services/analyticsService';
 
 type Props = {
   navigation: StackNavigationProp<HomeStackParamList, 'Photo'>;
@@ -255,6 +256,7 @@ export default function PhotoScreen({ navigation, route }: Props) {
         completed_at: new Date(),
       });
       setActionCompleted();
+      logActionCompleted(action.action_id, action.category, !!mediaUri);
       navigation.navigate('Complete', { recordId });
     } catch (e) {
       console.error('handleSave error:', e);
@@ -273,6 +275,7 @@ export default function PhotoScreen({ navigation, route }: Props) {
         completed_at: new Date(),
       });
       setActionCompleted();
+      logActionCompleted(action.action_id, action.category, false);
       navigation.navigate('Complete', { recordId });
     } catch (e) {
       console.error('handleSkip error:', e);

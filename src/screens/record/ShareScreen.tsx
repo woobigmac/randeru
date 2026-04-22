@@ -18,6 +18,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useActionStore } from '../../store/useActionStore';
 import { markAsShared } from '../../services/recordService';
 import { showRewardedAd } from '../../services/adService';
+import { logActionShared } from '../../services/analyticsService';
 import { DailyRecord, Action } from '../../types';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 import { Button } from '../../components/Button';
@@ -162,6 +163,7 @@ export default function ShareScreen({ navigation, route }: Props) {
     try {
       await markAsShared(record.record_id, channel);
       if (todayRecord?.record_id === record.record_id) setActionShared();
+      logActionShared(record.action_id, channel);
     } catch (e) {
       console.error('finalizeShare error:', e);
     }
