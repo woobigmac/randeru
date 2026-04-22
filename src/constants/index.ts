@@ -2,6 +2,8 @@ import { Platform } from 'react-native';
 import { Tone } from '../types';
 
 export const MAX_RESHUFFLE_COUNT = 3;
+export const FREE_RESHUFFLE_COUNT = 1;   // 기본 무료 재추첨 횟수
+export const AD_RESHUFFLE_COUNT = 2;     // 광고로 추가 가능한 횟수
 
 export const MIN_AGE = 10;
 export const MAX_AGE = 100;

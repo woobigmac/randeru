@@ -3,6 +3,7 @@ import {
   View,
   Text,
   ActivityIndicator,
+  Alert,
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +15,7 @@ import { useActionStore } from '../../store/useActionStore';
 import { useRecordStore } from '../../store/useRecordStore';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { MainTabParamList } from '../../navigation/MainTabNavigator';
-import { MAX_RESHUFFLE_COUNT } from '../../constants';
+import { MAX_RESHUFFLE_COUNT, FREE_RESHUFFLE_COUNT } from '../../constants';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 import { ActionCard } from '../../components/ActionCard';
 import { Button } from '../../components/Button';
@@ -42,6 +43,7 @@ export default function HomeScreen({ navigation }: Props) {
     loadTodayAction,
     receiveAction,
     reshuffleAction,
+    reshuffleWithAd,
   } = useActionStore();
   const streakDays = useRecordStore((s) => s.stats.streakDays);
 
@@ -49,7 +51,34 @@ export default function HomeScreen({ navigation }: Props) {
     if (user?.user_id) loadTodayAction(user.user_id);
   }, [user?.user_id]);
 
-  const remainingReshuffle = MAX_RESHUFFLE_COUNT - (todayRecord?.reshuffle_count ?? 0);
+  const reshuffleCount = todayRecord?.reshuffle_count ?? 0;
+  const isFreeAvailable = reshuffleCount < FREE_RESHUFFLE_COUNT;
+  const isAdAvailable = reshuffleCount >= FREE_RESHUFFLE_COUNT && reshuffleCount < MAX_RESHUFFLE_COUNT;
+  const isExhausted = reshuffleCount >= MAX_RESHUFFLE_COUNT;
+
+  const reshuffleLabel = isFreeAvailable
+    ? `다른 액션 보기 (${FREE_RESHUFFLE_COUNT - reshuffleCount}회 남음)`
+    : isAdAvailable
+    ? '광고 보고 한 번 더 뽑기'
+    : '오늘 재추첨을 모두 사용했어요';
+
+  const handleReshuffle = () => {
+    if (!user || isExhausted) return;
+
+    if (isAdAvailable) {
+      Alert.alert(
+        '추가 재추첨',
+        '무료 재추첨을 모두 사용했어요.\n짧은 광고를 보면 1회 더 뽑을 수 있어요!',
+        [
+          { text: '괜찮아요', style: 'cancel' },
+          { text: '광고 보고 뽑기', onPress: () => reshuffleWithAd(user.user_id) },
+        ],
+      );
+      return;
+    }
+
+    reshuffleAction(user.user_id);
+  };
 
   // ─── 로딩 ────────────────────────────────────────────────────────────────
   if (isLoading) {
@@ -120,14 +149,10 @@ export default function HomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('ActionDetail', { action: todayAction })}
           />
           <Button
-            label={
-              remainingReshuffle > 0
-                ? `다른 액션 보기 (${remainingReshuffle}회 남음)`
-                : '재추첨 횟수를 모두 사용했어요'
-            }
-            onPress={() => user && reshuffleAction(user.user_id)}
+            label={reshuffleLabel}
+            onPress={handleReshuffle}
             variant="text"
-            disabled={remainingReshuffle <= 0}
+            disabled={isExhausted}
             style={{ marginTop: Spacing.lg }}
           />
           <Button
