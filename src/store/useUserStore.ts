@@ -2,7 +2,13 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { loginWithKakao as kakaoLogin, logoutKakao, unlinkKakao } from '../services/authService';
+import {
+  loginWithKakao as kakaoLogin,
+  loginWithApple as appleLogin,
+  logoutKakao,
+  logoutApple,
+  unlinkKakao,
+} from '../services/authService';
 import { User, Tone } from '../types';
 import { DEFAULT_PUSH_TIME } from '../constants';
 
@@ -20,6 +26,7 @@ interface UserState {
 
   loadUser: () => Promise<void>;
   loginWithKakao: () => Promise<{ isNewUser: boolean }>;
+  loginWithApple: () => Promise<{ isNewUser: boolean }>;
   loginAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -110,6 +117,48 @@ export const useUserStore = create<UserState>((set, get) => ({
     return { isNewUser };
   },
 
+  loginWithApple: async () => {
+    const { appleId, email, fullName } = await appleLogin();
+    const docId = `apple_${appleId}`;
+    const docRef = doc(db, 'users', docId);
+    const docSnap = await getDoc(docRef);
+
+    let user: User;
+    let isNewUser: boolean;
+
+    if (docSnap.exists()) {
+      user = docSnap.data() as User;
+      isNewUser = false;
+    } else {
+      user = {
+        user_id: docId,
+        nickname: fullName ?? email?.split('@')[0] ?? '랜데루 유저',
+        loginType: 'apple',
+        selected_tones: [],
+        push_enabled: true,
+        push_time: DEFAULT_PUSH_TIME,
+        created_at: new Date(),
+        age: 20,
+      };
+      // email/fullName은 Apple에서 최초 1회만 제공되므로 즉시 저장
+      await setDoc(docRef, { ...user, ...(email && { profileImage: undefined }) });
+      isNewUser = true;
+    }
+
+    await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+    if (!isNewUser) {
+      await AsyncStorage.setItem(STORAGE_KEY_ONBOARDING, 'true');
+    }
+
+    set({
+      user,
+      isLoggedIn: true,
+      isOnboardingComplete: !isNewUser,
+    });
+
+    return { isNewUser };
+  },
+
   loginAsGuest: async () => {
     const user: User = {
       user_id: generateUserId(),
@@ -128,12 +177,11 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   logout: async () => {
     const { user } = get();
-    if (user?.loginType === 'kakao') {
-      try {
-        await logoutKakao();
-      } catch (e) {
-        console.warn('logoutKakao error:', e);
-      }
+    try {
+      if (user?.loginType === 'kakao') await logoutKakao();
+      else if (user?.loginType === 'apple') logoutApple();
+    } catch (e) {
+      console.warn('logout error:', e);
     }
     await get().clearUser();
   },

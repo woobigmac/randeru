@@ -72,7 +72,7 @@ export const logReshuffle = (reshuffleCount: number, usedAd: boolean): void => {
 };
 
 /** 로그인 시 */
-export const logLogin = (loginType: 'kakao' | 'guest'): void => {
+export const logLogin = (loginType: 'kakao' | 'apple' | 'guest'): void => {
   void safe(() => analytics().logLogin({ method: loginType }));
 };
 

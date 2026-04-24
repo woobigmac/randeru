@@ -15,7 +15,8 @@
     "ios": {
       "icon": "./assets/icon.png",
       "supportsTablet": true,
-      "bundleIdentifier": "com.randeru.app"
+      "bundleIdentifier": "com.randeru.app",
+      "usesAppleSignIn": true
     },
     "android": {
       "icon": "./assets/icon.png",

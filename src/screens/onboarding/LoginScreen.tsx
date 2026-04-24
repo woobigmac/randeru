@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserStore } from '../../store/useUserStore';
@@ -16,7 +17,21 @@ import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const loginWithKakao = useUserStore((s) => s.loginWithKakao);
+  const loginWithApple = useUserStore((s) => s.loginWithApple);
   const loginAsGuest = useUserStore((s) => s.loginAsGuest);
+
+  const handleAppleLogin = async () => {
+    setIsLoading(true);
+    try {
+      await loginWithApple();
+      logLogin('apple');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Apple 로그인에 실패했어요.';
+      Alert.alert('로그인 실패', message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleKakaoLogin = async () => {
     setIsLoading(true);
@@ -64,6 +79,18 @@ export default function LoginScreen() {
             <ActivityIndicator color={Colors.white} size="large" />
           ) : (
             <>
+              {/* Apple 로그인 — iOS에서만 표시, 애플 정책상 최상단 */}
+              {Platform.OS === 'ios' && (
+                <TouchableOpacity
+                  style={styles.appleButton}
+                  onPress={handleAppleLogin}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.appleLogo}></Text>
+                  <Text style={styles.appleText}>Apple로 시작하기</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={styles.kakaoButton}
                 onPress={handleKakaoLogin}
@@ -128,6 +155,27 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     alignItems: 'center',
     paddingBottom: Spacing.md,
+  },
+  appleButton: {
+    width: '100%',
+    height: 52,
+    backgroundColor: '#000000',
+    borderRadius: Radius.full,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: Spacing.sm,
+  },
+  appleLogo: {
+    fontSize: 20,
+    color: '#FFFFFF',
+    lineHeight: 24,
+  },
+  appleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   kakaoButton: {
     width: '100%',
