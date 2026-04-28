@@ -2,7 +2,10 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserStore } from '../../store/useUserStore';
-import { registerPushToken } from '../../services/notificationService';
+import {
+  registerPushToken,
+  scheduleDailyNotification,
+} from '../../services/notificationService';
 import { logAppOpen } from '../../services/analyticsService';
 import { Colors, Fonts } from '../../constants/theme';
 
@@ -13,17 +16,18 @@ export default function SplashScreen() {
 
   useEffect(() => {
     const init = async () => {
-      // 유저 로드와 최소 2500ms 대기를 병렬 실행 — 둘 다 끝나야 진행
       await Promise.all([loadUser(), delay(2500)]);
       logAppOpen();
 
-      // 온보딩 완료 유저라면 push token 등록 (실패해도 계속 진행)
       const { user, isOnboardingComplete } = useUserStore.getState();
       if (isOnboardingComplete && user?.user_id) {
         registerPushToken(user.user_id).catch(() => {});
-      }
 
-      // isOnboardingComplete에 따라 RootNavigator가 자동 분기
+        // push 알림 활성화 상태면 앱 시작 시 재등록
+        if (user.push_enabled && user.push_time) {
+          scheduleDailyNotification(user.push_time).catch(() => {});
+        }
+      }
     };
 
     init();
