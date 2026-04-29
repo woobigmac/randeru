@@ -18,8 +18,8 @@ const TAB_ICONS = {
   // HomeTab: { active: require('../assets/icons/home_active.png'), inactive: require('../assets/icons/home_inactive.png') },
   // Records:  { active: require('../assets/icons/records_active.png'), inactive: require('../assets/icons/records_inactive.png') },
   // MyPage:   { active: require('../assets/icons/mypage_active.png'), inactive: require('../assets/icons/mypage_inactive.png') },
-  active: require('../assets/icons/tab_active.png'),
-  inactive: require('../assets/icons/tab_inactive.png'),
+  active: require('../../assets/icons/tab_active.png'),
+  inactive: require('../../assets/icons/tab_inactive.png'),
 };
 
 function tabIcon(focused: boolean) {

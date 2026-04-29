@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserStore } from '../../store/useUserStore';
 import {
   registerPushToken,
-  scheduleDailyNotification,
+  scheduleDailySlotNotifications,
 } from '../../services/notificationService';
 import { logAppOpen } from '../../services/analyticsService';
 import { Colors, Fonts } from '../../constants/theme';
@@ -23,9 +23,9 @@ export default function SplashScreen() {
       if (isOnboardingComplete && user?.user_id) {
         registerPushToken(user.user_id).catch(() => {});
 
-        // push 알림 활성화 상태면 앱 시작 시 재등록
-        if (user.push_enabled && user.push_time) {
-          scheduleDailyNotification(user.push_time).catch(() => {});
+        // push 알림 활성화 상태면 슬롯별 알림 재등록
+        if (user.push_enabled) {
+          scheduleDailySlotNotifications(user.push_slots).catch(() => {});
         }
       }
     };

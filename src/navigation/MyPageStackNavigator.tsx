@@ -4,12 +4,14 @@ import MyPageScreen from '../screens/tabs/MyPageScreen';
 import ToneSelectScreen from '../screens/onboarding/ToneSelectScreen';
 import NotificationSettingScreen from '../screens/settings/NotificationSettingScreen';
 import SettingScreen from '../screens/settings/SettingScreen';
+import ProfileEditScreen from '../screens/settings/ProfileEditScreen';
 
 export type MyPageStackParamList = {
   MyPageMain: undefined;
   ToneSelect: undefined;
   NotificationSetting: undefined;
   Setting: undefined;
+  ProfileEdit: undefined;
 };
 
 const Stack = createStackNavigator<MyPageStackParamList>();
@@ -33,6 +35,7 @@ export default function MyPageStackNavigator() {
         component={SettingScreen}
         options={{ headerShown: true, title: '설정', headerBackTitle: '' }}
       />
+      <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
     </Stack.Navigator>
   );
 }

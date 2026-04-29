@@ -1,36 +1,59 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
+  SectionList,
   TouchableOpacity,
   Image,
   ScrollView,
   ActivityIndicator,
-  ListRenderItemInfo,
   StyleSheet,
+  SectionListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useUserStore } from '../../store/useUserStore';
 import { useRecordStore, RecordWithAction } from '../../store/useRecordStore';
 import { RecordsStackParamList } from '../../navigation/RecordsStackNavigator';
 import { MainTabParamList } from '../../navigation/MainTabNavigator';
-import { TONES } from '../../constants';
+import { TONES, DAILY_SLOTS } from '../../constants';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 import { EmptyState } from '../../components/EmptyState';
-import { Tone } from '../../types';
+import { Tone, SlotId } from '../../types';
 
 type RecordsNavProp = StackNavigationProp<RecordsStackParamList, 'RecordsList'>;
 
-const ITEM_HEIGHT = 88;
 const FILTER_OPTIONS: Array<{ id: 'all' | Tone; label: string }> = [
   { id: 'all', label: '전체' },
   ...TONES.map((t) => ({ id: t.id, label: t.label })),
 ];
+
 const formatDate = (d: string) => d.replace(/-/g, '.');
+
+const SLOT_LABEL: Record<SlotId, string> = { morning: '아침', lunch: '점심', evening: '저녁' };
+
+interface DateSection {
+  date: string;
+  data: RecordWithAction[];
+}
+
+function groupByDate(records: RecordWithAction[]): DateSection[] {
+  const map: Record<string, RecordWithAction[]> = {};
+  for (const item of records) {
+    const d = item.record.action_date;
+    if (!map[d]) map[d] = [];
+    map[d].push(item);
+  }
+  return Object.keys(map)
+    .sort((a, b) => b.localeCompare(a))
+    .map((date) => ({ date, data: map[date] }));
+}
+
+function getCompletedSlots(items: RecordWithAction[]): SlotId[] {
+  return items.map((i) => (i.record.slot_id ?? 'morning') as SlotId);
+}
 
 export default function RecordsScreen() {
   const navigation = useNavigation<RecordsNavProp>();
@@ -39,25 +62,64 @@ export default function RecordsScreen() {
   const { stats, isLoading, selectedFilter, loadRecords, setFilter, getFilteredRecords } =
     useRecordStore();
 
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     if (user?.user_id) loadRecords(user.user_id);
   }, [user?.user_id]);
 
   const filteredRecords = getFilteredRecords();
+  const sections = groupByDate(filteredRecords);
 
-  const keyExtractor = useCallback((item: RecordWithAction) => item.record.record_id, []);
-  const getItemLayout = useCallback(
-    (_: ArrayLike<RecordWithAction> | null | undefined, index: number) => ({
-      length: ITEM_HEIGHT,
-      offset: ITEM_HEIGHT * index,
-      index,
-    }),
-    [],
+  const toggleDate = useCallback((date: string) => {
+    setCollapsedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  }, []);
+
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: DateSection }) => {
+      const isCollapsed = collapsedDates.has(section.date);
+      const completedSlots = getCompletedSlots(section.data);
+      return (
+        <TouchableOpacity
+          onPress={() => toggleDate(section.date)}
+          activeOpacity={0.75}
+          style={styles.sectionHeader}
+        >
+          <View style={styles.sectionHeaderLeft}>
+            <Text style={styles.sectionDate}>{formatDate(section.date)}</Text>
+            <View style={styles.slotPillRow}>
+              {DAILY_SLOTS.map((slot) => {
+                const done = completedSlots.includes(slot.id);
+                return (
+                  <View
+                    key={slot.id}
+                    style={[styles.slotPill, done && styles.slotPillDone]}
+                  >
+                    <Text style={[styles.slotPillText, done && styles.slotPillTextDone]}>
+                      {slot.label}{done ? '✓' : ''}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+          <Text style={styles.collapseArrow}>{isCollapsed ? '›' : '⌄'}</Text>
+        </TouchableOpacity>
+      );
+    },
+    [collapsedDates, toggleDate],
   );
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<RecordWithAction>) => {
+    ({ item, section }: SectionListRenderItemInfo<RecordWithAction, DateSection>) => {
+      if (collapsedDates.has(section.date)) return null;
       const { record, action } = item;
+      const slotId = (record.slot_id ?? 'morning') as SlotId;
       return (
         <TouchableOpacity
           onPress={() => navigation.navigate('RecordDetail', { record, action })}
@@ -81,8 +143,12 @@ export default function RecordsScreen() {
             <View style={styles.thumbnailPlaceholder} />
           )}
           <View style={styles.itemText}>
-            <Text style={styles.itemTitle} numberOfLines={1}>{action.title}</Text>
-            <Text style={styles.itemDate}>{formatDate(record.action_date)}</Text>
+            <View style={styles.itemTopRow}>
+              <View style={styles.slotTag}>
+                <Text style={styles.slotTagText}>{SLOT_LABEL[slotId]}</Text>
+              </View>
+              <Text style={styles.itemTitle} numberOfLines={1}>{action.title}</Text>
+            </View>
             {record.memo ? (
               <Text style={styles.itemMemo} numberOfLines={1}>{record.memo}</Text>
             ) : null}
@@ -90,7 +156,7 @@ export default function RecordsScreen() {
         </TouchableOpacity>
       );
     },
-    [navigation],
+    [navigation, collapsedDates],
   );
 
   return (
@@ -139,21 +205,20 @@ export default function RecordsScreen() {
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
+      ) : sections.length === 0 ? (
+        <EmptyState
+          message="아직 기록이 없어요"
+          ctaLabel="오늘의 랜데루 — 뽑으러 가기"
+          onCtaPress={() => tabNavigation.navigate('HomeTab')}
+        />
       ) : (
-        <FlatList
-          data={filteredRecords}
-          keyExtractor={keyExtractor}
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.record.record_id}
+          renderSectionHeader={renderSectionHeader}
           renderItem={renderItem}
-          getItemLayout={getItemLayout}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={filteredRecords.length === 0 ? { flex: 1 } : undefined}
-          ListEmptyComponent={
-            <EmptyState
-              message="아직 기록이 없어요"
-              ctaLabel="오늘의 랜데루 — 뽑으러 가기"
-              onCtaPress={() => tabNavigation.navigate('HomeTab')}
-            />
-          }
+          stickySectionHeadersEnabled={false}
         />
       )}
     </SafeAreaView>
@@ -164,17 +229,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.sm },
-  pageTitle: {
-    fontFamily: Fonts.handwriting,
-    fontSize: 28,
-    color: Colors.text,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
+  pageTitle: { fontFamily: Fonts.handwriting, fontSize: 28, color: Colors.text },
+
+  statsRow: { flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: Spacing.lg, marginBottom: Spacing.md },
   statCard: {
     flex: 1,
     backgroundColor: Colors.surface,
@@ -182,42 +239,52 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     alignItems: 'center',
   },
-  statValue: {
-    fontFamily: Fonts.handwriting,
-    fontSize: 28,
-    color: Colors.primary,
-    marginBottom: 2,
-  },
+  statValue: { fontFamily: Fonts.handwriting, fontSize: 28, color: Colors.primary, marginBottom: 2 },
   statLabel: { fontSize: 12, color: Colors.textSecondary },
-  filterRow: {
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.sm,
-    paddingBottom: Spacing.md,
-  },
-  filterPill: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
-  },
+
+  filterRow: { paddingHorizontal: Spacing.lg, gap: Spacing.sm, paddingBottom: Spacing.md },
+  filterPill: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: Radius.full, backgroundColor: Colors.surface },
   filterPillSelected: { backgroundColor: Colors.primary },
   filterText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
   filterTextSelected: { color: Colors.white, fontWeight: '600' },
-  item: {
+
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: ITEM_HEIGHT,
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    backgroundColor: Colors.white,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.background,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  thumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: Radius.sm,
-    marginRight: Spacing.md,
+  sectionHeaderLeft: { flex: 1 },
+  sectionDate: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: 4 },
+  slotPillRow: { flexDirection: 'row', gap: 4 },
+  slotPill: {
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
+  slotPillDone: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
+  slotPillText: { fontSize: 11, color: Colors.textTertiary },
+  slotPillTextDone: { color: Colors.primaryDark, fontWeight: '600' },
+  collapseArrow: { fontSize: 18, color: Colors.textTertiary, marginLeft: Spacing.sm },
+
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    minHeight: 72,
+  },
+  thumbnail: { width: 60, height: 60, borderRadius: Radius.sm, marginRight: Spacing.md },
   videoIcon: {
     position: 'absolute',
     bottom: 3,
@@ -238,7 +305,14 @@ const styles = StyleSheet.create({
     marginRight: Spacing.md,
   },
   itemText: { flex: 1 },
-  itemTitle: { fontSize: 15, fontWeight: '600', color: Colors.text, marginBottom: 2 },
-  itemDate: { fontSize: 12, color: Colors.textTertiary, marginBottom: 2 },
+  itemTopRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: 4 },
+  slotTag: {
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.primaryLight,
+  },
+  slotTagText: { fontSize: 10, color: Colors.primaryDark, fontWeight: '600' },
+  itemTitle: { flex: 1, fontSize: 14, fontWeight: '600', color: Colors.text },
   itemMemo: { fontSize: 12, color: Colors.textSecondary },
 });

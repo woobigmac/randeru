@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../services/firebase';
 import {
   loginWithKakao as kakaoLogin,
   loginWithApple as appleLogin,
@@ -34,6 +35,7 @@ interface UserState {
   setSelectedTones: (tones: Tone[]) => Promise<void>;
   setAge: (age: number) => Promise<void>;
   setPushSettings: (enabled: boolean, time: string) => Promise<void>;
+  updateProfile: (params: { nickname?: string; age?: number; imageUri?: string }) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   clearUser: () => Promise<void>;
 }
@@ -252,6 +254,45 @@ export const useUserStore = create<UserState>((set, get) => ({
       await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
     } catch (e) {
       console.error('setPushSettings save error:', e);
+    }
+  },
+
+  updateProfile: async ({ nickname, age, imageUri }) => {
+    const currentUser = get().user;
+    if (!currentUser) return;
+
+    let profileImage = currentUser.profileImage;
+    if (imageUri) {
+      try {
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        const storageRef = ref(storage, `profiles/${currentUser.user_id}.jpg`);
+        await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
+        profileImage = await getDownloadURL(storageRef);
+      } catch (e) {
+        console.error('profileImage upload error:', e);
+      }
+    }
+
+    const updated: User = {
+      ...currentUser,
+      ...(nickname !== undefined && { nickname }),
+      ...(age !== undefined && { age }),
+      ...(profileImage !== undefined && { profileImage }),
+    };
+
+    set({ user: updated });
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
+      if (currentUser.user_id) {
+        await updateDoc(doc(db, 'users', currentUser.user_id), {
+          ...(nickname !== undefined && { nickname }),
+          ...(age !== undefined && { age }),
+          ...(profileImage !== undefined && { profileImage }),
+        });
+      }
+    } catch (e) {
+      console.error('updateProfile save error:', e);
     }
   },
 

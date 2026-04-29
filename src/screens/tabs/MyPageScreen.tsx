@@ -135,7 +135,15 @@ export default function MyPageScreen({ navigation }: Props) {
 
         {/* 프로필 카드 */}
         <View style={styles.profileCard}>
-          <Text style={styles.nickname}>{user?.nickname ?? ''}</Text>
+          <View style={styles.profileTopRow}>
+            <Text style={styles.nickname}>{user?.nickname ?? ''}</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ProfileEdit')}
+              style={styles.editBtn}
+            >
+              <Text style={styles.editBtnText}>내 정보 수정</Text>
+            </TouchableOpacity>
+          </View>
           {!!joinedDate && (
             <Text style={styles.joinedDate}>{joinedDate} 가입</Text>
           )}
@@ -268,11 +276,24 @@ const styles = StyleSheet.create({
     margin: Spacing.lg,
     padding: Spacing.lg,
   },
+  profileTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  editBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  editBtnText: { fontSize: 12, color: Colors.primary, fontWeight: '500' },
   nickname: {
     fontFamily: Fonts.handwriting,
     fontSize: 22,
     color: Colors.text,
-    marginBottom: 4,
   },
   joinedDate: {
     fontSize: 12,

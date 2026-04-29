@@ -1,115 +1,197 @@
 import { Alert } from 'react-native';
 import { create } from 'zustand';
-import { Action, DailyRecord, ActionStatus, Tone } from '../types';
+import { Action, DailyRecord, ActionStatus, DailySlotStatus, SlotId, Tone } from '../types';
 import {
-  getTodayAction,
-  getActionById,
+  getTodaySlots,
   getRandomAction,
-  acceptAction,
+  acceptSlotAction,
   reshuffleAction as reshuffleActionService,
 } from '../services/actionService';
 import { showRewardedAd } from '../services/adService';
-import { MAX_RESHUFFLE_COUNT, FREE_RESHUFFLE_COUNT } from '../constants';
+import { DAILY_SLOTS, MAX_RESHUFFLE_COUNT, FREE_RESHUFFLE_COUNT } from '../constants';
+
+function getCurrentSlotId(): SlotId {
+  const now = new Date();
+  const h = now.getHours();
+  const m = now.getMinutes();
+  const totalMin = h * 60 + m;
+
+  // 19:00 이후 → 저녁
+  if (totalMin >= 19 * 60) return 'evening';
+  // 12:30 이후 → 점심
+  if (totalMin >= 12 * 60 + 30) return 'lunch';
+  // 07:00 이후 → 아침
+  if (totalMin >= 7 * 60) return 'morning';
+  // 07:00 이전 → 아직 아무것도 없으므로 아침 (잠긴 상태로 표시됨)
+  return 'morning';
+}
 
 interface ActionStoreState {
+  todaySlots: DailySlotStatus[];
+  activeSlotId: SlotId | null;
+  isLoading: boolean;
+  isAdLoading: boolean;
+  error: string | null;
+
+  // 하위 호환 — CompleteScreen / ShareScreen / PhotoScreen 등에서 사용
   todayAction: Action | null;
   todayRecord: DailyRecord | null;
   actionStatus: ActionStatus;
-  isLoading: boolean;
-  error: string | null;
-  needsAdForReshuffle: boolean;
 
-  loadTodayAction: (userId: string) => Promise<void>;
-  receiveAction: (userId: string, tones: Tone[]) => Promise<void>;
-  reshuffleAction: (userId: string) => Promise<void>;
-  reshuffleWithAd: (userId: string) => Promise<void>;
+  loadTodaySlots: (userId: string) => Promise<void>;
+  receiveSlotAction: (userId: string, slotId: SlotId) => Promise<void>;
+  setActiveSlot: (slotId: SlotId) => void;
   setActionCompleted: () => void;
   setActionShared: () => void;
+
+  // 리셔플 (activeSlot 기준)
+  reshuffleAction: (userId: string) => Promise<void>;
+  reshuffleWithAd: (userId: string) => Promise<void>;
+}
+
+function deriveFromSlot(slots: DailySlotStatus[], slotId: SlotId | null) {
+  const slot = slots.find((s) => s.slot_id === slotId);
+  if (!slot) return { todayAction: null, todayRecord: null, actionStatus: 'not_received' as ActionStatus };
+  return {
+    todayAction: slot.action,
+    todayRecord: slot.record,
+    actionStatus: (
+      slot.status === 'completed' ? 'completed' :
+      slot.status === 'accepted' ? 'accepted' :
+      'not_received'
+    ) as ActionStatus,
+  };
 }
 
 export const useActionStore = create<ActionStoreState>((set, get) => ({
+  todaySlots: [],
+  activeSlotId: null,
+  isLoading: false,
+  isAdLoading: false,
+  error: null,
   todayAction: null,
   todayRecord: null,
   actionStatus: 'not_received',
-  isLoading: false,
-  error: null,
-  needsAdForReshuffle: false,
 
-  loadTodayAction: async (userId) => {
+  loadTodaySlots: async (userId) => {
     set({ isLoading: true, error: null });
     try {
-      const record = await getTodayAction(userId);
-      if (!record) {
-        set({ actionStatus: 'not_received', todayAction: null, todayRecord: null, isLoading: false });
-        return;
-      }
-      const action = await getActionById(record.action_id);
+      const slots = await getTodaySlots(userId);
+      const slotId = getCurrentSlotId();
       set({
-        todayRecord: record,
-        todayAction: action,
-        actionStatus: record.status as ActionStatus,
+        todaySlots: slots,
+        activeSlotId: slotId,
         isLoading: false,
+        ...deriveFromSlot(slots, slotId),
       });
     } catch (e) {
-      console.error('loadTodayAction error:', e);
-      set({ error: '액션을 불러오지 못했어요', isLoading: false });
+      console.error('loadTodaySlots error:', e);
+      set({ error: '슬롯을 불러오지 못했어요', isLoading: false });
     }
   },
 
-  receiveAction: async (userId, tones) => {
+  receiveSlotAction: async (userId, slotId) => {
     set({ isLoading: true, error: null });
     try {
-      const action = await getRandomAction([], tones);
+      // 해당 슬롯에서 이미 사용된 액션 제외
+      const { todaySlots } = get();
+      const usedIds = todaySlots
+        .filter((s) => s.action !== null)
+        .map((s) => s.action!.action_id);
+
+      const action = await getRandomAction(usedIds, []);
       if (!action) {
         set({ error: '사용 가능한 액션이 없어요', isLoading: false });
         return;
       }
-      const record = await acceptAction(userId, action);
+      const record = await acceptSlotAction(userId, action, slotId);
+
+      const updatedSlots = todaySlots.map((s) =>
+        s.slot_id === slotId
+          ? { ...s, record, action, status: 'accepted' as const }
+          : s,
+      );
+
       set({
-        todayAction: action,
-        todayRecord: record,
-        actionStatus: 'accepted',
+        todaySlots: updatedSlots,
         isLoading: false,
+        ...deriveFromSlot(updatedSlots, slotId),
       });
     } catch (e) {
-      console.error('receiveAction error:', e);
-      set({ error: '액션을 받아오지 못했어요. 다시 시도해주세요', isLoading: false });
+      console.error('receiveSlotAction error:', e);
+      set({ error: '액션을 받아오지 못했어요', isLoading: false });
     }
   },
 
+  setActiveSlot: (slotId) => {
+    const { todaySlots } = get();
+    set({ activeSlotId: slotId, ...deriveFromSlot(todaySlots, slotId) });
+  },
+
+  setActionCompleted: () => {
+    const { todaySlots, activeSlotId } = get();
+    if (!activeSlotId) return;
+    const updatedSlots = todaySlots.map((s) =>
+      s.slot_id === activeSlotId && s.record
+        ? {
+            ...s,
+            status: 'completed' as const,
+            record: { ...s.record, status: 'completed' as const },
+          }
+        : s,
+    );
+    set({
+      todaySlots: updatedSlots,
+      actionStatus: 'completed',
+      todayRecord: updatedSlots.find((s) => s.slot_id === activeSlotId)?.record ?? null,
+    });
+  },
+
+  setActionShared: () => {
+    const { todaySlots, activeSlotId } = get();
+    if (!activeSlotId) return;
+    const updatedSlots = todaySlots.map((s) =>
+      s.slot_id === activeSlotId && s.record
+        ? {
+            ...s,
+            status: 'completed' as const,
+            record: { ...s.record, status: 'shared' as const },
+          }
+        : s,
+    );
+    set({
+      todaySlots: updatedSlots,
+      actionStatus: 'shared',
+      todayRecord: updatedSlots.find((s) => s.slot_id === activeSlotId)?.record ?? null,
+    });
+  },
+
   reshuffleAction: async (_userId) => {
-    const { todayRecord, todayAction } = get();
-    if (!todayRecord || !todayAction) return;
+    const { todaySlots, activeSlotId } = get();
+    if (!activeSlotId) return;
+    const activeSlot = todaySlots.find((s) => s.slot_id === activeSlotId);
+    if (!activeSlot?.record || !activeSlot?.action) return;
 
-    const reshuffleCount = todayRecord.reshuffle_count ?? 0;
-
-    // 최대 횟수 초과 시 중단
+    const reshuffleCount = activeSlot.record.reshuffle_count ?? 0;
     if (reshuffleCount >= MAX_RESHUFFLE_COUNT) return;
+    if (reshuffleCount >= FREE_RESHUFFLE_COUNT) return; // 광고 필요 → reshuffleWithAd 사용
 
-    // 무료 횟수 소진 시 광고 시청 필요 신호만 세우고 리턴
-    if (reshuffleCount >= FREE_RESHUFFLE_COUNT) {
-      set({ needsAdForReshuffle: true });
-      return;
-    }
-
-    // 무료 횟수 내: 바로 재추첨 진행
-    set({ isLoading: true, error: null, needsAdForReshuffle: false });
+    set({ isLoading: true, error: null });
     try {
-      const newAction = await getRandomAction([todayAction.action_id], []);
+      const usedIds = todaySlots.filter((s) => s.action).map((s) => s.action!.action_id);
+      const newAction = await getRandomAction(usedIds, []);
       if (!newAction) {
         set({ error: '다른 액션을 찾지 못했어요', isLoading: false });
         return;
       }
-      await reshuffleActionService(todayRecord.record_id, newAction, reshuffleCount);
-      set({
-        todayAction: newAction,
-        todayRecord: {
-          ...todayRecord,
-          action_id: newAction.action_id,
-          reshuffle_count: reshuffleCount + 1,
-        },
-        isLoading: false,
-      });
+      await reshuffleActionService(activeSlot.record.record_id, newAction, reshuffleCount);
+      const updatedRecord = { ...activeSlot.record, action_id: newAction.action_id, reshuffle_count: reshuffleCount + 1 };
+      const updatedSlots = todaySlots.map((s) =>
+        s.slot_id === activeSlotId
+          ? { ...s, action: newAction, record: updatedRecord }
+          : s,
+      );
+      set({ todaySlots: updatedSlots, todayAction: newAction, todayRecord: updatedRecord, isLoading: false });
     } catch (e) {
       console.error('reshuffleAction error:', e);
       set({ error: '재추첨에 실패했어요', isLoading: false });
@@ -117,57 +199,41 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
   },
 
   reshuffleWithAd: async (_userId) => {
-    const { todayRecord, todayAction } = get();
-    if (!todayRecord || !todayAction) return;
+    const { todaySlots, activeSlotId } = get();
+    if (!activeSlotId) return;
+    const activeSlot = todaySlots.find((s) => s.slot_id === activeSlotId);
+    if (!activeSlot?.record || !activeSlot?.action) return;
 
-    const reshuffleCount = todayRecord.reshuffle_count ?? 0;
+    const reshuffleCount = activeSlot.record.reshuffle_count ?? 0;
     if (reshuffleCount >= MAX_RESHUFFLE_COUNT) return;
 
-    set({ isLoading: true, error: null, needsAdForReshuffle: false });
+    set({ isAdLoading: true, error: null });
     try {
       const rewarded = await showRewardedAd();
       if (!rewarded) {
-        set({ isLoading: false });
+        set({ isAdLoading: false });
         Alert.alert('광고 미완료', '광고를 끝까지 시청해야 추가 재추첨이 가능해요.');
         return;
       }
 
-      const newAction = await getRandomAction([todayAction.action_id], []);
+      set({ isAdLoading: false, isLoading: true });
+      const usedIds = todaySlots.filter((s) => s.action).map((s) => s.action!.action_id);
+      const newAction = await getRandomAction(usedIds, []);
       if (!newAction) {
         set({ error: '다른 액션을 찾지 못했어요', isLoading: false });
         return;
       }
-      await reshuffleActionService(todayRecord.record_id, newAction, reshuffleCount);
-      set({
-        todayAction: newAction,
-        todayRecord: {
-          ...todayRecord,
-          action_id: newAction.action_id,
-          reshuffle_count: reshuffleCount + 1,
-        },
-        isLoading: false,
-      });
+      await reshuffleActionService(activeSlot.record.record_id, newAction, reshuffleCount);
+      const updatedRecord = { ...activeSlot.record, action_id: newAction.action_id, reshuffle_count: reshuffleCount + 1 };
+      const updatedSlots = todaySlots.map((s) =>
+        s.slot_id === activeSlotId
+          ? { ...s, action: newAction, record: updatedRecord }
+          : s,
+      );
+      set({ todaySlots: updatedSlots, todayAction: newAction, todayRecord: updatedRecord, isLoading: false });
     } catch (e) {
       console.error('reshuffleWithAd error:', e);
-      set({ error: '재추첨에 실패했어요', isLoading: false });
+      set({ error: '재추첨에 실패했어요', isLoading: false, isAdLoading: false });
     }
-  },
-
-  setActionCompleted: () => {
-    const { todayRecord } = get();
-    if (!todayRecord) return;
-    set({
-      actionStatus: 'completed',
-      todayRecord: { ...todayRecord, status: 'completed' },
-    });
-  },
-
-  setActionShared: () => {
-    const { todayRecord } = get();
-    if (!todayRecord) return;
-    set({
-      actionStatus: 'shared',
-      todayRecord: { ...todayRecord, status: 'shared' },
-    });
   },
 }));

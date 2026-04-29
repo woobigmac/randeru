@@ -10,7 +10,8 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Action, DailyRecord, Tone } from '../types';
+import { Action, DailyRecord, DailySlotStatus, SlotId, Tone } from '../types';
+import { DAILY_SLOTS } from '../constants';
 
 const getTodayDate = (): string => {
   const d = new Date();
@@ -19,9 +20,14 @@ const getTodayDate = (): string => {
   ).padStart(2, '0')}`;
 };
 
+/** 현재 기기 시각 기준으로 슬롯 활성화 여부를 반환한다. */
+function isSlotAvailable(hour: number, minute: number): boolean {
+  const now = new Date();
+  return now.getHours() > hour || (now.getHours() === hour && now.getMinutes() >= minute);
+}
+
 /**
- * 오늘 날짜로 해당 유저의 기록을 조회한다.
- * 없으면 null 반환.
+ * 오늘 날짜로 해당 유저의 기록을 조회한다. (하위 호환 — 단일 record)
  */
 export async function getTodayAction(userId: string): Promise<DailyRecord | null> {
   try {
@@ -42,6 +48,66 @@ export async function getTodayAction(userId: string): Promise<DailyRecord | null
 }
 
 /**
+ * 오늘 3개 슬롯의 상태를 반환한다.
+ * - slot_id 없는 기존 record는 'morning'으로 처리한다.
+ */
+export async function getTodaySlots(userId: string): Promise<DailySlotStatus[]> {
+  try {
+    const today = getTodayDate();
+    const q = query(
+      collection(db, 'records'),
+      where('user_id', '==', userId),
+      where('action_date', '==', today),
+    );
+    const snapshot = await getDocs(q);
+    const todayRecords = snapshot.docs.map(
+      (d) => ({ record_id: d.id, ...d.data() } as DailyRecord),
+    );
+
+    // action 일괄 조회
+    const actionIds = [...new Set(todayRecords.map((r) => r.action_id))];
+    const actionMap: Record<string, Action> = {};
+    await Promise.all(
+      actionIds.map(async (id) => {
+        const snap = await getDoc(doc(db, 'actions', id));
+        if (snap.exists()) actionMap[id] = { action_id: snap.id, ...snap.data() } as Action;
+      }),
+    );
+
+    return DAILY_SLOTS.map((slot) => {
+      const record =
+        todayRecords.find((r) => (r.slot_id ?? 'morning') === slot.id) ?? null;
+      const action = record ? (actionMap[record.action_id] ?? null) : null;
+      const available = isSlotAvailable(slot.hour, slot.minute);
+
+      let status: DailySlotStatus['status'];
+      if (!available) {
+        status = 'locked';
+      } else if (!record) {
+        status = 'available';
+      } else if (record.status === 'completed' || record.status === 'shared') {
+        status = 'completed';
+      } else {
+        status = 'accepted';
+      }
+
+      return { slot_id: slot.id, label: slot.label, time: slot.time, isAvailable: available, record, action, status };
+    });
+  } catch (e) {
+    console.error('getTodaySlots error:', e);
+    return DAILY_SLOTS.map((slot) => ({
+      slot_id: slot.id,
+      label: slot.label,
+      time: slot.time,
+      isAvailable: isSlotAvailable(slot.hour, slot.minute),
+      record: null,
+      action: null,
+      status: isSlotAvailable(slot.hour, slot.minute) ? 'available' : 'locked',
+    }));
+  }
+}
+
+/**
  * Firestore 'actions' 컬렉션에서 액션 1개를 조회한다.
  */
 export async function getActionById(actionId: string): Promise<Action | null> {
@@ -56,8 +122,7 @@ export async function getActionById(actionId: string): Promise<Action | null> {
 }
 
 /**
- * is_active && is_photo_required인 액션 중 excludeIds를 제외하고 랜덤으로 1개 반환.
- * tones: MVP에서는 무시 (순수 랜덤). v2에서 가중치 랜덤 예정.
+ * 랜덤 액션 1개 반환.
  */
 export async function getRandomAction(
   excludeIds: string[],
@@ -70,11 +135,9 @@ export async function getRandomAction(
       where('is_photo_required', '==', true),
     );
     const snapshot = await getDocs(q);
-
     const candidates = snapshot.docs
       .map((d) => ({ action_id: d.id, ...d.data() } as Action))
       .filter((a) => !excludeIds.includes(a.action_id));
-
     if (candidates.length === 0) return null;
     return candidates[Math.floor(Math.random() * candidates.length)];
   } catch (e) {
@@ -84,11 +147,12 @@ export async function getRandomAction(
 }
 
 /**
- * 'records' 컬렉션에 새 기록을 생성하고 DailyRecord를 반환한다.
+ * 슬롯에 새 record를 생성한다. slot_id 포함.
  */
-export async function acceptAction(
+export async function acceptSlotAction(
   userId: string,
   action: Action,
+  slotId: SlotId,
 ): Promise<DailyRecord> {
   const today = getTodayDate();
   const now = new Date();
@@ -97,6 +161,7 @@ export async function acceptAction(
     user_id: userId,
     action_id: action.action_id,
     action_date: today,
+    slot_id: slotId,
     status: 'accepted' as const,
     photo_uploaded: false,
     reshuffle_count: 0,
@@ -104,16 +169,18 @@ export async function acceptAction(
   };
 
   const ref = await addDoc(collection(db, 'records'), payload);
-
-  return {
-    record_id: ref.id,
-    ...payload,
-    accepted_at: now,
-  };
+  return { record_id: ref.id, ...payload, accepted_at: now };
 }
 
 /**
- * 기존 record의 action_id를 새 액션으로 교체하고 reshuffle_count를 +1한다.
+ * 하위 호환: 슬롯 없는 단일 record 생성.
+ */
+export async function acceptAction(userId: string, action: Action): Promise<DailyRecord> {
+  return acceptSlotAction(userId, action, 'morning');
+}
+
+/**
+ * 기존 record의 action_id를 새 액션으로 교체한다.
  */
 export async function reshuffleAction(
   recordId: string,

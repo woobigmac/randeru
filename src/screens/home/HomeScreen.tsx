@@ -3,7 +3,8 @@ import {
   View,
   Text,
   ActivityIndicator,
-  Alert,
+  ScrollView,
+  TouchableOpacity,
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,12 +13,10 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useUserStore } from '../../store/useUserStore';
 import { useActionStore } from '../../store/useActionStore';
-import { useRecordStore } from '../../store/useRecordStore';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { MainTabParamList } from '../../navigation/MainTabNavigator';
-import { MAX_RESHUFFLE_COUNT, FREE_RESHUFFLE_COUNT } from '../../constants';
-import { logActionReceived, logActionAccepted, logReshuffle } from '../../services/analyticsService';
-import { useActionStore as useActionStoreRaw } from '../../store/useActionStore';
+import { DAILY_SLOTS } from '../../constants';
+import { DailySlotStatus, SlotId } from '../../types';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 import { ActionCard } from '../../components/ActionCard';
 import { Button } from '../../components/Button';
@@ -37,69 +36,25 @@ const getTodayStr = () => {
 export default function HomeScreen({ navigation }: Props) {
   const user = useUserStore((s) => s.user);
   const {
-    todayAction,
-    todayRecord,
-    actionStatus,
+    todaySlots,
+    activeSlotId,
     isLoading,
+    isAdLoading,
     error,
-    loadTodayAction,
-    receiveAction,
-    reshuffleAction,
-    reshuffleWithAd,
+    loadTodaySlots,
+    receiveSlotAction,
+    setActiveSlot,
   } = useActionStore();
-  const streakDays = useRecordStore((s) => s.stats.streakDays);
 
   useEffect(() => {
-    if (user?.user_id) loadTodayAction(user.user_id);
+    if (user?.user_id) loadTodaySlots(user.user_id);
   }, [user?.user_id]);
 
-  const reshuffleCount = todayRecord?.reshuffle_count ?? 0;
-  const isFreeAvailable = reshuffleCount < FREE_RESHUFFLE_COUNT;
-  const isAdAvailable = reshuffleCount >= FREE_RESHUFFLE_COUNT && reshuffleCount < MAX_RESHUFFLE_COUNT;
-  const isExhausted = reshuffleCount >= MAX_RESHUFFLE_COUNT;
+  const activeSlot = todaySlots.find((s) => s.slot_id === activeSlotId) ?? null;
+  const completedCount = todaySlots.filter(
+    (s) => s.status === 'completed',
+  ).length;
 
-  const handleReceiveAction = async () => {
-    if (!user) return;
-    await receiveAction(user.user_id, user.selected_tones);
-    const received = useActionStoreRaw.getState().todayAction;
-    if (received) {
-      logActionReceived(received.action_id, received.category);
-      logActionAccepted(received.action_id, received.category);
-    }
-  };
-
-  const reshuffleLabel = isFreeAvailable
-    ? `다른 액션 보기 (${FREE_RESHUFFLE_COUNT - reshuffleCount}회 남음)`
-    : isAdAvailable
-    ? '광고 보고 한 번 더 뽑기'
-    : '오늘 재추첨을 모두 사용했어요';
-
-  const handleReshuffle = () => {
-    if (!user || isExhausted) return;
-
-    if (isAdAvailable) {
-      Alert.alert(
-        '추가 재추첨',
-        '무료 재추첨을 모두 사용했어요.\n짧은 광고를 보면 1회 더 뽑을 수 있어요!',
-        [
-          { text: '괜찮아요', style: 'cancel' },
-          {
-            text: '광고 보고 뽑기',
-            onPress: () => {
-              logReshuffle(reshuffleCount, true);
-              reshuffleWithAd(user.user_id);
-            },
-          },
-        ],
-      );
-      return;
-    }
-
-    logReshuffle(reshuffleCount, false);
-    reshuffleAction(user.user_id);
-  };
-
-  // ─── 로딩 ────────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -108,7 +63,6 @@ export default function HomeScreen({ navigation }: Props) {
     );
   }
 
-  // ─── 에러 ────────────────────────────────────────────────────────────────
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
@@ -116,7 +70,7 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.errorText}>{error}</Text>
           <Button
             label="다시 시도"
-            onPress={() => user?.user_id && loadTodayAction(user.user_id)}
+            onPress={() => user?.user_id && loadTodaySlots(user.user_id)}
             variant="secondary"
             style={{ marginTop: Spacing.md }}
           />
@@ -129,103 +83,206 @@ export default function HomeScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container}>
       {/* 상단 인사 */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>
-            {user?.nickname ? `${user.nickname}님,` : '안녕하세요,'}
-          </Text>
-          <Text style={styles.date}>{getTodayStr()}</Text>
-        </View>
-
-        {/* 연속 수행일 배지 */}
-        {streakDays > 0 && (
-          <View style={styles.streakBadge}>
-            <Text style={styles.streakText}>{streakDays}일 연속 🔥</Text>
-          </View>
-        )}
+        <Text style={styles.greeting}>
+          {user?.nickname ? `${user.nickname}님,` : '안녕하세요,'}
+        </Text>
+        <Text style={styles.date}>{getTodayStr()}</Text>
       </View>
 
-      {/* ─── not_received ─────────────────────────────────────────────────── */}
-      {actionStatus === 'not_received' && (
-        <View style={styles.body}>
-          <View style={styles.dashedCard}>
-            <Text style={styles.dashedTitle}>오늘의 액션을{'\n'}뽑아보세요</Text>
-            <Text style={styles.dashedSub}>매일 하나, 인간다운 행동</Text>
-          </View>
-          <Button
-            label="오늘의 액션 뽑기"
-            onPress={handleReceiveAction}
-            style={styles.mainButton}
-          />
-        </View>
-      )}
+      {/* 슬롯 탭 */}
+      <View style={styles.tabRow}>
+        {DAILY_SLOTS.map((slot) => {
+          const slotData = todaySlots.find((s) => s.slot_id === slot.id);
+          const isActive = activeSlotId === slot.id;
+          const isCompleted = slotData?.status === 'completed';
+          const isLocked = slotData?.status === 'locked';
 
-      {/* ─── accepted ─────────────────────────────────────────────────────── */}
-      {actionStatus === 'accepted' && todayAction && (
-        <View style={styles.body}>
-          <ActionCard
-            action={todayAction}
-            status="accepted"
-            onPress={() => navigation.navigate('ActionDetail', { action: todayAction })}
-          />
-          <Button
-            label={reshuffleLabel}
-            onPress={handleReshuffle}
-            variant="text"
-            disabled={isExhausted}
-            style={{ marginTop: Spacing.lg }}
-          />
-          <Button
-            label="자세히 보기"
-            onPress={() => navigation.navigate('ActionDetail', { action: todayAction })}
-            style={styles.mainButton}
-          />
-        </View>
-      )}
+          return (
+            <TouchableOpacity
+              key={slot.id}
+              onPress={() => setActiveSlot(slot.id)}
+              activeOpacity={0.75}
+              style={[
+                styles.tab,
+                isActive && styles.tabActive,
+                isLocked && styles.tabLocked,
+              ]}
+            >
+              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive, isLocked && styles.tabLabelLocked]}>
+                {isCompleted ? '✓ ' : isLocked ? '🔒 ' : ''}{slot.label}
+              </Text>
+              <Text style={[styles.tabTime, isActive && styles.tabTimeActive, isLocked && styles.tabTimeLocked]}>
+                {slot.time}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
-      {/* ─── completed / shared ───────────────────────────────────────────── */}
-      {(actionStatus === 'completed' || actionStatus === 'shared') && todayAction && (
-        <View style={styles.body}>
-          <ActionCard
-            action={todayAction}
-            status="completed"
-            onPress={() => {}}
-          />
-          <Button
-            label="기록 보기"
-            onPress={() => navigation.navigate('Records')}
-            variant="secondary"
-            style={styles.mainButton}
-          />
-          {actionStatus !== 'shared' && todayRecord && (
-            <Button
-              label="공유하기"
-              onPress={() =>
-                navigation.navigate('Share', { record: todayRecord, action: todayAction })
-              }
-              style={{ marginTop: Spacing.sm }}
-            />
-          )}
-        </View>
-      )}
+      {/* 슬롯 콘텐츠 */}
+      <ScrollView
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+      >
+        <SlotContent
+          slot={activeSlot}
+          slotId={activeSlotId}
+          isAdLoading={isAdLoading}
+          onReceive={() => {
+            if (user?.user_id && activeSlotId) {
+              receiveSlotAction(user.user_id, activeSlotId);
+            }
+          }}
+          onDetail={() => {
+            if (activeSlot?.action) {
+              navigation.navigate('ActionDetail', { action: activeSlot.action });
+            }
+          }}
+          onComplete={() => {
+            if (activeSlot?.record) {
+              navigation.navigate('Photo', {
+                recordId: activeSlot.record.record_id,
+                action: activeSlot.action!,
+              });
+            }
+          }}
+          onShare={() => {
+            if (activeSlot?.record && activeSlot?.action) {
+              navigation.navigate('Share', {
+                record: activeSlot.record,
+                action: activeSlot.action,
+              });
+            }
+          }}
+          onRecords={() => navigation.navigate('Records')}
+        />
+      </ScrollView>
+
+      {/* 하단 오늘의 진행 */}
+      <View style={styles.progress}>
+        {completedCount === 3 ? (
+          <Text style={styles.progressDone}>오늘 하루 정말 인간다웠어요 🌸</Text>
+        ) : (
+          <Text style={styles.progressText}>오늘 {completedCount}/3 완료</Text>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
+// ─── 슬롯별 콘텐츠 ────────────────────────────────────────────────────────────
+type SlotContentProps = {
+  slot: DailySlotStatus | null;
+  slotId: SlotId | null;
+  isAdLoading: boolean;
+  onReceive: () => void;
+  onDetail: () => void;
+  onComplete: () => void;
+  onShare: () => void;
+  onRecords: () => void;
+};
+
+function SlotContent({ slot, slotId, isAdLoading, onReceive, onDetail, onComplete, onShare, onRecords }: SlotContentProps) {
+  if (!slot || !slotId) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="small" color={Colors.primary} />
+      </View>
+    );
+  }
+
+  const slotDef = DAILY_SLOTS.find((s) => s.id === slot.slot_id);
+
+  // locked
+  if (slot.status === 'locked') {
+    return (
+      <View style={styles.slotContent}>
+        <Text style={styles.lockIcon}>🔒</Text>
+        <Text style={styles.lockText}>{slotDef?.time}에 열려요</Text>
+        <Text style={styles.lockSub}>{slot.label} 랜데루를 기다려주세요</Text>
+      </View>
+    );
+  }
+
+  // available
+  if (slot.status === 'available') {
+    return (
+      <View style={styles.slotContent}>
+        <View style={styles.dashedCard}>
+          <Text style={styles.dashedTitle}>{slot.label}의 액션을{'\n'}뽑아볼까요?</Text>
+          <Text style={styles.dashedSub}>매 시간대마다 새로운 랜데루</Text>
+        </View>
+        <Button
+          label={`${slot.label} 액션 뽑기`}
+          onPress={onReceive}
+          style={styles.mainButton}
+          disabled={isAdLoading}
+        />
+      </View>
+    );
+  }
+
+  // accepted
+  if (slot.status === 'accepted' && slot.action) {
+    return (
+      <View style={styles.slotContent}>
+        <ActionCard
+          action={slot.action}
+          status="accepted"
+          onPress={onDetail}
+        />
+        <Button
+          label="자세히 보기"
+          onPress={onDetail}
+          style={styles.mainButton}
+        />
+        <Button
+          label="완료 인증하기"
+          onPress={onComplete}
+          variant="secondary"
+          style={{ marginTop: Spacing.sm }}
+        />
+      </View>
+    );
+  }
+
+  // completed
+  if ((slot.status === 'completed') && slot.action) {
+    return (
+      <View style={styles.slotContent}>
+        <View style={styles.completedBadge}>
+          <Text style={styles.completedBadgeText}>✓ 완료</Text>
+        </View>
+        <ActionCard
+          action={slot.action}
+          status="completed"
+          onPress={() => {}}
+        />
+        <Button
+          label="기록 보기"
+          onPress={onRecords}
+          variant="secondary"
+          style={styles.mainButton}
+        />
+        {slot.record?.status !== 'shared' && slot.record && (
+          <Button
+            label="공유하기"
+            onPress={onShare}
+            style={{ marginTop: Spacing.sm }}
+          />
+        )}
+      </View>
+    );
+  }
+
+  return null;
+}
+
+// ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.lg,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.lg },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
@@ -235,27 +292,53 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: Colors.text,
   },
-  date: {
-    fontSize: 13,
-    color: Colors.textTertiary,
-    marginTop: 2,
-  },
-  streakBadge: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: Radius.full,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  streakText: {
-    fontSize: 12,
-    color: Colors.primaryDark,
-    fontWeight: '600',
-  },
-  body: {
-    flex: 1,
+  date: { fontSize: 13, color: Colors.textTertiary, marginTop: 2 },
+
+  tabRow: {
+    flexDirection: 'row',
     paddingHorizontal: Spacing.lg,
-    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  tabActive: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
+  },
+  tabLocked: { opacity: 0.45 },
+  tabLabel: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary, marginBottom: 2 },
+  tabLabelActive: { color: Colors.primary },
+  tabLabelLocked: { color: Colors.textTertiary },
+  tabTime: { fontSize: 11, color: Colors.textTertiary },
+  tabTimeActive: { color: Colors.primaryDark },
+  tabTimeLocked: { color: Colors.textTertiary },
+
+  body: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xl,
+    flexGrow: 1,
+  },
+
+  slotContent: { flex: 1, justifyContent: 'center' },
+
+  lockIcon: { fontSize: 48, textAlign: 'center', marginBottom: Spacing.md },
+  lockText: {
+    fontFamily: Fonts.handwriting,
+    fontSize: 20,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  lockSub: { fontSize: 14, color: Colors.textTertiary, textAlign: 'center' },
+
   dashedCard: {
     borderWidth: 1.5,
     borderColor: Colors.primaryLight,
@@ -273,16 +356,31 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     lineHeight: 32,
   },
-  dashedSub: {
-    fontSize: 14,
-    color: Colors.textTertiary,
+  dashedSub: { fontSize: 14, color: Colors.textTertiary },
+
+  completedBadge: {
+    alignSelf: 'center',
+    backgroundColor: Colors.success + '22',
+    borderRadius: Radius.full,
+    paddingVertical: 4,
+    paddingHorizontal: 14,
+    marginBottom: Spacing.md,
   },
-  mainButton: {
-    marginTop: Spacing.lg,
+  completedBadgeText: { fontSize: 13, color: Colors.success, fontWeight: '600' },
+
+  mainButton: { marginTop: Spacing.lg },
+  errorText: { fontSize: 14, color: Colors.error, textAlign: 'center' },
+
+  progress: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
   },
-  errorText: {
+  progressText: { fontSize: 13, color: Colors.textSecondary },
+  progressDone: {
     fontSize: 14,
-    color: Colors.error,
-    textAlign: 'center',
+    color: Colors.primary,
+    fontFamily: Fonts.handwriting,
   },
 });

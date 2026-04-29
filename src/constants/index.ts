@@ -1,14 +1,28 @@
 import { Platform } from 'react-native';
-import { Tone } from '../types';
+import { Tone, SlotId } from '../types';
 
 export const MAX_RESHUFFLE_COUNT = 3;
-export const FREE_RESHUFFLE_COUNT = 1;   // 기본 무료 재추첨 횟수
-export const AD_RESHUFFLE_COUNT = 2;     // 광고로 추가 가능한 횟수
+export const FREE_RESHUFFLE_COUNT = 1;
+export const AD_RESHUFFLE_COUNT = 2;
 
 export const MIN_AGE = 10;
 export const MAX_AGE = 100;
 
 export const DEFAULT_PUSH_TIME = '09:00';
+
+export const MAX_DAILY_ACTIONS = 3;
+
+export const DAILY_SLOTS: ReadonlyArray<{
+  id: SlotId;
+  label: string;
+  time: string;
+  hour: number;
+  minute: number;
+}> = [
+  { id: 'morning', label: '아침', time: '07:00', hour: 7, minute: 0 },
+  { id: 'lunch', label: '점심', time: '12:30', hour: 12, minute: 30 },
+  { id: 'evening', label: '저녁', time: '19:00', hour: 19, minute: 0 },
+];
 
 export const TONES: { id: Tone; label: string; description: string }[] = [
   {
@@ -54,8 +68,6 @@ export const HASHTAGS: Record<string, string[]> = {
   common: ['#오늘의루틴', '#랜덤데일리루틴', '#랜데루'],
 };
 
-// ─── AdMob 광고 단위 ID ────────────────────────────────────────────────────────
-
 export const ADMOB_REWARDED_AD_UNIT_ID = Platform.select({
   ios: 'ca-app-pub-5402672709504975/7787411749',
   android: 'ca-app-pub-5402672709504975/2535085062',
@@ -68,7 +80,7 @@ export const ADMOB_BANNER_AD_UNIT_ID = Platform.select({
   default: 'ca-app-pub-5402672709504975/8742248224',
 }) as string;
 
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.0.1';
 
 export const MediaType = {
   PHOTO: 'photo',
@@ -76,4 +88,4 @@ export const MediaType = {
   BOTH: 'both',
 } as const;
 
-export const MAX_VIDEO_DURATION = 15; // 초
+export const MAX_VIDEO_DURATION = 15;
