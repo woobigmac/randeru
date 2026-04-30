@@ -16,7 +16,7 @@
       "icon": "./assets/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.randeru.app",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
@@ -62,6 +62,12 @@
       ],
       "./plugins/withKakaoInit",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "41f6859e-deb0-4647-8c80-2d6fc0cd8f15"
+      }
+    },
+    "owner": "woobigmac"
   }
 }

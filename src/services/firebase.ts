@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -14,7 +14,15 @@ const firebaseConfig = {
 // 중복 초기화 방지
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-export const db = getFirestore(app);
+// React Native에서 WebSocket 대신 Long Polling 사용 (연결 끊김 시 무한 대기 방지)
+let db: ReturnType<typeof getFirestore>;
+try {
+  db = initializeFirestore(app, { experimentalForceLongPolling: true });
+} catch {
+  db = getFirestore(app);
+}
+
+export { db };
 export const storage = getStorage(app);
 
 export default app;

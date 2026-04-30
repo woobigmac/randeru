@@ -40,6 +40,14 @@ export async function getRecordsByUser(userId: string): Promise<DailyRecord[]> {
 /**
  * 해당 유저의 완료/공유된 전체 기록을 action_date 내림차순으로 반환한다.
  */
+const firestoreTimeout = <T>(promise: Promise<T>, ms = 10000): Promise<T> =>
+  Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('firestore_timeout')), ms),
+    ),
+  ]);
+
 export async function getUserRecords(userId: string): Promise<DailyRecord[]> {
   try {
     const q = query(
@@ -47,7 +55,7 @@ export async function getUserRecords(userId: string): Promise<DailyRecord[]> {
       where('user_id', '==', userId),
       where('status', 'in', ['completed', 'shared']),
     );
-    const snapshot = await getDocs(q);
+    const snapshot = await firestoreTimeout(getDocs(q));
     const records = snapshot.docs.map((d) => ({ record_id: d.id, ...d.data() } as DailyRecord));
     return records.sort((a, b) => b.action_date.localeCompare(a.action_date));
   } catch (e) {
@@ -83,7 +91,7 @@ export async function getUserStats(
       where('user_id', '==', userId),
       where('status', 'in', ['completed', 'shared']),
     );
-    const snapshot = await getDocs(q);
+    const snapshot = await firestoreTimeout(getDocs(q));
     const totalCount = snapshot.size;
 
     const dateSet = new Set(snapshot.docs.map((d) => (d.data() as DailyRecord).action_date));

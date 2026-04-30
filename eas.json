@@ -1,11 +1,21 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 5.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "production": {
       "ios": {
-        "credentialsSource": "local"
+        "credentialsSource": "remote",
+        "autoIncrement": true
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "woobigmac15@daum.net",
+        "ascAppId": "6763446024"
       }
     }
   }

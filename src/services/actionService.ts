@@ -51,6 +51,14 @@ export async function getTodayAction(userId: string): Promise<DailyRecord | null
  * 오늘 3개 슬롯의 상태를 반환한다.
  * - slot_id 없는 기존 record는 'morning'으로 처리한다.
  */
+const firestoreTimeout = <T>(promise: Promise<T>, ms = 10000): Promise<T> =>
+  Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('firestore_timeout')), ms),
+    ),
+  ]);
+
 export async function getTodaySlots(userId: string): Promise<DailySlotStatus[]> {
   try {
     const today = getTodayDate();
@@ -59,7 +67,7 @@ export async function getTodaySlots(userId: string): Promise<DailySlotStatus[]> 
       where('user_id', '==', userId),
       where('action_date', '==', today),
     );
-    const snapshot = await getDocs(q);
+    const snapshot = await firestoreTimeout(getDocs(q));
     const todayRecords = snapshot.docs.map(
       (d) => ({ record_id: d.id, ...d.data() } as DailyRecord),
     );
@@ -132,9 +140,8 @@ export async function getRandomAction(
     const q = query(
       collection(db, 'actions'),
       where('is_active', '==', true),
-      where('is_photo_required', '==', true),
     );
-    const snapshot = await getDocs(q);
+    const snapshot = await firestoreTimeout(getDocs(q));
     const candidates = snapshot.docs
       .map((d) => ({ action_id: d.id, ...d.data() } as Action))
       .filter((a) => !excludeIds.includes(a.action_id));
