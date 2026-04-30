@@ -48,7 +48,7 @@ export default function AgeSelectScreen({ navigation }: Props) {
   const handleComplete = async () => {
     await setAge(selectedAge);
     await completeOnboarding();
-    logOnboardingComplete(selectedAge, user?.selected_tones ?? []);
+    logOnboardingComplete(selectedAge);
     if (user?.user_id) {
       registerPushToken(user.user_id).catch(() => {});
     }
@@ -87,7 +87,7 @@ export default function AgeSelectScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>나이가{'\n'}어떻게 되세요?</Text>
-        <Text style={styles.subtitle}>나이에 맞는 액션을 추천해드릴게요</Text>
+        <Text style={styles.subtitle}>더 편안한 이용을 위해 확인해요</Text>
 
         {/* 피커 영역 */}
         <View style={styles.pickerWrapper}>

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Action, DailyRecord, Tone } from '../types';
+import { Action, DailyRecord } from '../types';
 import { getUserRecords, getRecordWithAction, getUserStats } from '../services/recordService';
 
 export interface RecordWithAction {
@@ -20,11 +20,9 @@ interface RecordStoreState {
   recordsWithActions: RecordWithAction[];
   stats: { totalCount: number; streakDays: number };
   isLoading: boolean;
-  selectedFilter: 'all' | Tone;
 
   loadRecords: (userId: string) => Promise<void>;
-  setFilter: (filter: 'all' | Tone) => void;
-  getFilteredRecords: () => RecordWithAction[];
+  getRecordsWithActions: () => RecordWithAction[];
 }
 
 export const useRecordStore = create<RecordStoreState>((set, get) => ({
@@ -42,7 +40,6 @@ export const useRecordStore = create<RecordStoreState>((set, get) => ({
   recordsWithActions: [],
   stats: { totalCount: 0, streakDays: 0 },
   isLoading: false,
-  selectedFilter: 'all',
 
   loadRecords: async (userId) => {
     set({ isLoading: true });
@@ -61,11 +58,5 @@ export const useRecordStore = create<RecordStoreState>((set, get) => ({
     }
   },
 
-  setFilter: (filter) => set({ selectedFilter: filter }),
-
-  getFilteredRecords: () => {
-    const { recordsWithActions, selectedFilter } = get();
-    if (selectedFilter === 'all') return recordsWithActions;
-    return recordsWithActions.filter(({ action }) => action.category === selectedFilter);
-  },
+  getRecordsWithActions: () => get().recordsWithActions,
 }));

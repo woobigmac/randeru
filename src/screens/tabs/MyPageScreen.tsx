@@ -17,7 +17,7 @@ import { db } from '../../services/firebase';
 import { useUserStore } from '../../store/useUserStore';
 import { useRecordStore } from '../../store/useRecordStore';
 import { MyPageStackParamList } from '../../navigation/MyPageStackNavigator';
-import { TONES, APP_VERSION } from '../../constants';
+import { APP_VERSION } from '../../constants';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 
 type Props = {
@@ -48,13 +48,13 @@ const TERMS_TEXT = `제1조 (목적)
 
 // ─── 개인정보처리방침 텍스트 ─────────────────────────────────────────────────
 const PRIVACY_TEXT = `1. 수집하는 개인정보
-- 닉네임, 나이, 관심 톤 (서비스 제공 목적)
+- 닉네임, 나이 (서비스 제공 목적)
 - 카카오 로그인 시: 카카오 계정 ID, 프로필 정보
 - 서비스 이용 기록, 액션 수행 기록
 
 2. 개인정보 이용 목적
 - 서비스 제공 및 개선
-- 맞춤형 콘텐츠 추천
+- 랜덤 액션 제공
 - 푸시 알림 발송
 
 3. 개인정보 보관 기간
@@ -88,10 +88,6 @@ export default function MyPageScreen({ navigation }: Props) {
   useEffect(() => {
     if (user?.user_id) loadRecords(user.user_id);
   }, [user?.user_id]);
-
-  const toneLabels = (user?.selected_tones ?? []).map(
-    (id) => TONES.find((t) => t.id === id)?.label ?? id,
-  );
 
   const handleLogout = () => {
     Alert.alert('로그아웃', '정말 로그아웃 하시겠어요?', [
@@ -158,30 +154,6 @@ export default function MyPageScreen({ navigation }: Props) {
               <Text style={styles.statLabel}>연속 수행</Text>
             </View>
           </View>
-        </View>
-
-        {/* 관심 톤 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>관심 톤</Text>
-          {toneLabels.length > 0 ? (
-            <View style={styles.toneRow}>
-              {toneLabels.map((label) => (
-                <View key={label} style={styles.tonePill}>
-                  <Text style={styles.tonePillText}>{label}</Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View>
-              <Text style={styles.emptyToneText}>관심 톤을 아직 정하지 않았어요</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('ToneSelect')}
-                style={styles.toneButton}
-              >
-                <Text style={styles.toneButtonText}>관심 톤 정하러 가기</Text>
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
 
         {/* 메뉴 */}
@@ -310,37 +282,6 @@ const styles = StyleSheet.create({
   },
   statLabel: { fontSize: 11, color: Colors.textSecondary },
   pillDivider: { width: 1, height: 32, backgroundColor: Colors.border },
-
-  section: {
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.sm,
-  },
-  toneRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  tonePill: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: Radius.full,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-  },
-  tonePillText: { fontSize: 13, color: Colors.primaryDark, fontWeight: '500' },
-  emptyToneText: { fontSize: 14, color: Colors.textSecondary, marginBottom: Spacing.sm },
-  toneButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    borderRadius: Radius.full,
-  },
-  toneButtonText: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
 
   menuSection: {
     backgroundColor: Colors.white,

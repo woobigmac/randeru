@@ -1,30 +1,14 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Action } from '../types';
-import { Tag } from './Tag';
 import { Colors, Fonts, Radius, Spacing } from '../constants/theme';
 
-type TagColor = 'purple' | 'green' | 'orange' | 'gray';
 type Status = 'not_received' | 'accepted' | 'completed';
 
 type Props = {
   action: Action;
   status?: Status;
   onPress: () => void;
-};
-
-const TONE_LABELS: Record<string, string> = {
-  kind: '친절',
-  sense: '감성',
-  connect: '연결',
-  environment: '환경',
-};
-
-const TONE_COLORS: Record<string, TagColor> = {
-  kind: 'orange',
-  sense: 'purple',
-  connect: 'green',
-  environment: 'gray',
 };
 
 const DIFFICULTY_LABELS: Record<string, string> = {
@@ -35,8 +19,6 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 
 export function ActionCard({ action, status = 'accepted', onPress }: Props) {
   const isCompleted = status === 'completed';
-  const toneColor = TONE_COLORS[action.category] ?? 'gray';
-  const toneLabel = TONE_LABELS[action.category] ?? action.category;
 
   return (
     <TouchableOpacity
@@ -44,9 +26,10 @@ export function ActionCard({ action, status = 'accepted', onPress }: Props) {
       activeOpacity={0.85}
       style={[styles.card, isCompleted && styles.completed]}
     >
-      {/* 카테고리 태그 */}
       <View style={styles.tagRow}>
-        <Tag label={toneLabel} color={toneColor} />
+        <View style={styles.randomBadge}>
+          <Text style={styles.randomBadgeText}>랜덤 액션</Text>
+        </View>
         {isCompleted && (
           <View style={styles.checkBadge}>
             <Text style={styles.checkText}>✓ 완료</Text>
@@ -106,6 +89,17 @@ const styles = StyleSheet.create({
   checkText: {
     fontSize: 12,
     color: Colors.success,
+    fontWeight: '600',
+  },
+  randomBadge: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: Radius.full,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  randomBadgeText: {
+    fontSize: 12,
+    color: Colors.primaryDark,
     fontWeight: '600',
   },
   title: {

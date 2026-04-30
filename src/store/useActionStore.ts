@@ -5,6 +5,7 @@ import {
   getTodaySlots,
   getRandomAction,
   acceptSlotAction,
+  isFirestoreTimeoutError,
   reshuffleAction as reshuffleActionService,
 } from '../services/actionService';
 import { showRewardedAd } from '../services/adService';
@@ -41,7 +42,7 @@ interface ActionStoreState {
   loadTodaySlots: (userId: string) => Promise<void>;
   receiveSlotAction: (userId: string, slotId: SlotId) => Promise<void>;
   setActiveSlot: (slotId: SlotId) => void;
-  setActionCompleted: () => void;
+  setActionCompleted: (recordUpdates?: Partial<DailyRecord>) => void;
   setActionShared: () => void;
 
   // 리셔플 (activeSlot 기준)
@@ -91,6 +92,8 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
   },
 
   receiveSlotAction: async (userId, slotId) => {
+    if (get().isLoading) return;
+
     set({ isLoading: true, error: null });
     try {
       // 해당 슬롯에서 이미 사용된 액션 제외
@@ -119,7 +122,12 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
       });
     } catch (e) {
       console.error('receiveSlotAction error:', e);
-      set({ error: '액션을 받아오지 못했어요', isLoading: false });
+      set({
+        error: isFirestoreTimeoutError(e)
+          ? '서버 응답이 지연되고 있어요. 네트워크를 확인한 뒤 다시 시도해 주세요.'
+          : '액션을 받아오지 못했어요',
+        isLoading: false,
+      });
     }
   },
 
@@ -128,7 +136,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
     set({ activeSlotId: slotId, ...deriveFromSlot(todaySlots, slotId) });
   },
 
-  setActionCompleted: () => {
+  setActionCompleted: (recordUpdates = {}) => {
     const { todaySlots, activeSlotId } = get();
     if (!activeSlotId) return;
     const updatedSlots = todaySlots.map((s) =>
@@ -136,7 +144,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
         ? {
             ...s,
             status: 'completed' as const,
-            record: { ...s.record, status: 'completed' as const },
+            record: { ...s.record, ...recordUpdates, status: 'completed' as const },
           }
         : s,
     );
@@ -167,6 +175,8 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
   },
 
   reshuffleAction: async (_userId) => {
+    if (get().isLoading) return;
+
     const { todaySlots, activeSlotId } = get();
     if (!activeSlotId) return;
     const activeSlot = todaySlots.find((s) => s.slot_id === activeSlotId);
@@ -194,11 +204,18 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
       set({ todaySlots: updatedSlots, todayAction: newAction, todayRecord: updatedRecord, isLoading: false });
     } catch (e) {
       console.error('reshuffleAction error:', e);
-      set({ error: '재추첨에 실패했어요', isLoading: false });
+      set({
+        error: isFirestoreTimeoutError(e)
+          ? '서버 응답이 지연되고 있어요. 네트워크를 확인한 뒤 다시 시도해 주세요.'
+          : '재추첨에 실패했어요',
+        isLoading: false,
+      });
     }
   },
 
   reshuffleWithAd: async (_userId) => {
+    if (get().isLoading || get().isAdLoading) return;
+
     const { todaySlots, activeSlotId } = get();
     if (!activeSlotId) return;
     const activeSlot = todaySlots.find((s) => s.slot_id === activeSlotId);
@@ -233,7 +250,13 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
       set({ todaySlots: updatedSlots, todayAction: newAction, todayRecord: updatedRecord, isLoading: false });
     } catch (e) {
       console.error('reshuffleWithAd error:', e);
-      set({ error: '재추첨에 실패했어요', isLoading: false, isAdLoading: false });
+      set({
+        error: isFirestoreTimeoutError(e)
+          ? '서버 응답이 지연되고 있어요. 네트워크를 확인한 뒤 다시 시도해 주세요.'
+          : '재추첨에 실패했어요',
+        isLoading: false,
+        isAdLoading: false,
+      });
     }
   },
 }));

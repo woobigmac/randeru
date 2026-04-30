@@ -25,6 +25,7 @@ import { Header } from '../../components/Header';
 import { Button } from '../../components/Button';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 import { logActionCompleted } from '../../services/analyticsService';
+import { DailyRecord } from '../../types';
 
 type Props = {
   navigation: StackNavigationProp<HomeStackParamList, 'Photo'>;
@@ -158,16 +159,8 @@ export default function PhotoScreen({ navigation, route }: Props) {
   const { recordId, action } = route.params;
   const { setActionCompleted } = useActionStore();
   const user = useUserStore((s) => s.user);
-  const actionMediaType = action.media_type ?? 'photo';
 
-  // 탭 상태 ('both' 모드에서만 사용)
-  const [activeTab, setActiveTab] = useState<'photo' | 'video'>(
-    actionMediaType === 'video' ? 'video' : 'photo',
-  );
-
-  // 현재 유효한 미디어 타입
-  const currentMediaType: 'photo' | 'video' =
-    actionMediaType === 'both' ? activeTab : (actionMediaType as 'photo' | 'video');
+  const [activeTab, setActiveTab] = useState<'photo' | 'video'>('photo');
 
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [memo, setMemo] = useState('');
@@ -236,26 +229,29 @@ export default function PhotoScreen({ navigation, route }: Props) {
 
   // ─── 저장 ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
+    if (isSaving) return;
+
     setIsSaving(true);
     try {
       let mediaUrl: string | undefined;
       let thumbnailUrl: string | undefined;
       if (mediaUri && user?.user_id) {
-        const uploaded = await uploadMedia(user.user_id, recordId, mediaUri, currentMediaType);
+        const uploaded = await uploadMedia(user.user_id, recordId, mediaUri, activeTab);
         mediaUrl = uploaded.url;
         thumbnailUrl = uploaded.thumbnailUrl;
       }
-      await updateRecord(recordId, {
+      const completedRecord: Partial<DailyRecord> = {
         status: 'completed',
         photo_uploaded: !!mediaUri, // 하위 호환
-        ...(mediaUrl && currentMediaType === 'photo' && { photo_url: mediaUrl }), // 하위 호환
+        ...(mediaUrl && activeTab === 'photo' && { photo_url: mediaUrl }), // 하위 호환
         ...(mediaUrl && { media_url: mediaUrl }),
-        ...(mediaUrl && { media_type: currentMediaType }),
+        ...(mediaUrl && { media_type: activeTab }),
         ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
         ...(memo.trim() && { memo: memo.trim() }),
         completed_at: new Date(),
-      });
-      setActionCompleted();
+      };
+      await updateRecord(recordId, completedRecord);
+      setActionCompleted(completedRecord);
       logActionCompleted(action.action_id, action.category, !!mediaUri);
       navigation.navigate('Complete', { recordId });
     } catch (e) {
@@ -267,14 +263,17 @@ export default function PhotoScreen({ navigation, route }: Props) {
   };
 
   const handleSkip = async () => {
+    if (isSaving) return;
+
     setIsSaving(true);
     try {
-      await updateRecord(recordId, {
+      const completedRecord: Partial<DailyRecord> = {
         status: 'completed',
         photo_uploaded: false,
         completed_at: new Date(),
-      });
-      setActionCompleted();
+      };
+      await updateRecord(recordId, completedRecord);
+      setActionCompleted(completedRecord);
       logActionCompleted(action.action_id, action.category, false);
       navigation.navigate('Complete', { recordId });
     } catch (e) {
@@ -286,23 +285,16 @@ export default function PhotoScreen({ navigation, route }: Props) {
   };
 
   // ─── 렌더 ──────────────────────────────────────────────────────────────────
-  const headerTitle =
-    actionMediaType === 'both' ? '사진 & 영상' :
-    actionMediaType === 'video' ? '영상 & 기록' : '사진 & 기록';
-
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <SafeAreaView style={styles.container}>
-        <Header title={headerTitle} showBack />
+        <Header title="사진 & 영상" showBack />
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-          {/* 탭 ('both' 모드만) */}
-          {actionMediaType === 'both' && (
-            <TabBar activeTab={activeTab} onChange={handleTabChange} />
-          )}
+          <TabBar activeTab={activeTab} onChange={handleTabChange} />
 
           {/* ── 사진 UI ── */}
-          {currentMediaType === 'photo' && (
+          {activeTab === 'photo' && (
             <>
               {mediaUri ? (
                 <Image source={{ uri: mediaUri }} style={styles.preview} resizeMode="cover" />
@@ -319,7 +311,7 @@ export default function PhotoScreen({ navigation, route }: Props) {
           )}
 
           {/* ── 영상 UI ── */}
-          {currentMediaType === 'video' && (
+          {activeTab === 'video' && (
             <>
               {mediaUri ? (
                 <VideoPreview uri={mediaUri} />

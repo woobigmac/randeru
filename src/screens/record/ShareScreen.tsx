@@ -16,8 +16,6 @@ import { RouteProp } from '@react-navigation/native';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
-import { readAsStringAsync, EncodingType } from 'expo-file-system/legacy';
-import { shareCustomTemplate } from '@react-native-kakao/share';
 import { useActionStore } from '../../store/useActionStore';
 import { markAsShared } from '../../services/recordService';
 import { showRewardedAd } from '../../services/adService';
@@ -216,9 +214,15 @@ export default function ShareScreen({ navigation, route }: Props) {
     new Promise((resolve, reject) => {
       const tryCapture = async () => {
         try {
-          const uri = await captureRef(cardRef as React.RefObject<React.Component>, {
+          if (!cardRef.current) {
+            reject(new Error('share_card_not_ready'));
+            return;
+          }
+
+          const uri = await captureRef(cardRef.current, {
             format: 'jpg',
             quality: 0.95,
+            result: 'tmpfile',
           });
           resolve(uri);
         } catch (e) {
@@ -241,6 +245,38 @@ export default function ShareScreen({ navigation, route }: Props) {
       }
     });
 
+  const saveCapturedImage = async (uri: string) => {
+    const permission = await MediaLibrary.requestPermissionsAsync(false);
+    const canSave =
+      permission.status === 'granted' ||
+      (permission as MediaLibrary.PermissionResponse & { accessPrivileges?: string })
+        .accessPrivileges === 'limited';
+
+    if (!canSave) {
+      Alert.alert('권한 필요', '이미지를 저장하려면 갤러리 접근 권한이 필요해요.');
+      return false;
+    }
+
+    await MediaLibrary.createAssetAsync(uri);
+    return true;
+  };
+
+  const shareCapturedImage = async (uri: string) => {
+    const available = await Sharing.isAvailableAsync();
+    if (!available) {
+      const saved = await saveCapturedImage(uri);
+      if (saved) Alert.alert('저장 완료', '공유 이미지를 갤러리에 저장했어요.');
+      return saved;
+    }
+
+    await Sharing.shareAsync(uri, {
+      mimeType: 'image/jpeg',
+      dialogTitle: '랜데루 공유하기',
+      UTI: 'public.jpeg',
+    });
+    return true;
+  };
+
   const finalizeShare = async (channel: string) => {
     try {
       await markAsShared(record.record_id, channel);
@@ -258,21 +294,19 @@ export default function ShareScreen({ navigation, route }: Props) {
     try {
       await showRewardedAd();
       const uri = await captureCard();
+      const saved = await saveCapturedImage(uri);
+      if (!saved) return;
 
-      const igUrl = 'instagram-stories://share';
-      const canOpen = await Linking.canOpenURL(igUrl);
-      if (!canOpen) {
-        Alert.alert('인스타그램 앱을 설치해주세요');
-        return;
+      const instagramUrl = 'instagram://app';
+      const canOpen = await Linking.canOpenURL(instagramUrl);
+      if (canOpen) {
+        Alert.alert('이미지가 저장됐어요', '인스타그램에서 저장된 이미지를 선택해 공유해주세요.', [
+          { text: '인스타그램 열기', onPress: () => Linking.openURL(instagramUrl) },
+          { text: '닫기', style: 'cancel' },
+        ]);
+      } else {
+        await shareCapturedImage(uri);
       }
-
-      // base64로 인코딩 후 URL Scheme 호출
-      const base64 = await readAsStringAsync(uri, {
-        encoding: EncodingType.Base64,
-      });
-      await Linking.openURL(
-        `instagram-stories://share?backgroundImage=${encodeURIComponent(`data:image/jpeg;base64,${base64}`)}`,
-      );
       await finalizeShare('instagram');
     } catch (e) {
       console.error('handleInstagram error:', e);
@@ -282,39 +316,19 @@ export default function ShareScreen({ navigation, route }: Props) {
     }
   };
 
-  // ── 카카오톡 ──────────────────────────────────────────────────────────────
-  const handleKakao = async () => {
+  // ── OS 공유 시트 ──────────────────────────────────────────────────────────
+  const handleShareSheet = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
       await showRewardedAd();
       const uri = await captureCard();
-
-      const kakaoUrl = 'kakaolink://';
-      const canOpen = await Linking.canOpenURL(kakaoUrl);
-      if (!canOpen) {
-        Alert.alert('카카오톡 앱을 설치해주세요');
-        return;
-      }
-
-      // templateId는 카카오 개발자 콘솔에서 발급받은 커스텀 템플릿 ID로 교체 필요
-      await shareCustomTemplate({
-        templateId: 0,
-        templateArgs: {
-          title: action.title,
-          description: action.share_copy_template,
-          imageUri: uri,
-        },
-      });
-      await finalizeShare('kakaotalk');
-    } catch (e: any) {
-      // 템플릿 ID 미설정 등 개발 단계 오류는 무시
-      if (String(e?.message).includes('templateId')) {
-        Alert.alert('안내', '카카오 공유 템플릿을 설정해주세요 (카카오 개발자 콘솔).');
-      } else {
-        console.error('handleKakao error:', e);
-        Alert.alert('오류', '카카오 공유 중 문제가 발생했어요.');
-      }
+      const shared = await shareCapturedImage(uri);
+      if (!shared) return;
+      await finalizeShare('share_sheet');
+    } catch (e) {
+      console.error('handleShareSheet error:', e);
+      Alert.alert('오류', '공유 중 문제가 발생했어요. 다시 시도해주세요.');
     } finally {
       setIsProcessing(false);
     }
@@ -328,13 +342,8 @@ export default function ShareScreen({ navigation, route }: Props) {
       await showRewardedAd();
       const uri = await captureCard();
 
-      // 갤러리에 저장
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('권한 필요', '이미지를 저장하려면 갤러리 접근 권한이 필요해요.');
-        return;
-      }
-      await MediaLibrary.saveToLibraryAsync(uri);
+      const saved = await saveCapturedImage(uri);
+      if (!saved) return;
 
       const threadsUrl = 'threads://';
       const canOpen = await Linking.canOpenURL(threadsUrl);
@@ -371,12 +380,8 @@ export default function ShareScreen({ navigation, route }: Props) {
       await showRewardedAd();
       const uri = await captureCard();
 
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('권한 필요', '이미지를 저장하려면 갤러리 접근 권한이 필요해요.');
-        return;
-      }
-      await MediaLibrary.saveToLibraryAsync(uri);
+      const saved = await saveCapturedImage(uri);
+      if (!saved) return;
       Alert.alert('저장 완료', '이미지가 갤러리에 저장됐어요');
       await finalizeShare('save_image');
     } catch (e) {
@@ -423,8 +428,8 @@ export default function ShareScreen({ navigation, route }: Props) {
             disabled={isProcessing}
           />
           <ShareOptionCard
-            label="카카오톡에 공유"
-            onPress={handleKakao}
+            label="다른 앱으로 공유"
+            onPress={handleShareSheet}
             disabled={isProcessing}
           />
           <ShareOptionCard

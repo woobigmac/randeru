@@ -5,7 +5,6 @@ export type ActionStatus = 'not_received' | 'accepted' | 'completed' | 'shared';
 export interface User {
   user_id: string;
   nickname: string;
-  selected_tones: Tone[];
   push_enabled: boolean;
   push_time: string;
   push_slots?: { morning: boolean; lunch: boolean; evening: boolean };

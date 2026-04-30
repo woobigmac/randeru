@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { Tone, SlotId } from '../types';
+import { SlotId } from '../types';
 
 export const MAX_RESHUFFLE_COUNT = 3;
 export const FREE_RESHUFFLE_COUNT = 1;
@@ -24,29 +24,6 @@ export const DAILY_SLOTS: ReadonlyArray<{
   { id: 'evening', label: '저녁', time: '19:00', hour: 19, minute: 0 },
 ];
 
-export const TONES: { id: Tone; label: string; description: string }[] = [
-  {
-    id: 'kind',
-    label: '친절',
-    description: '낯선 사람에게 따뜻한 말 한마디, 문 잡아주기 등 작은 친절을 실천해요.',
-  },
-  {
-    id: 'sense',
-    label: '감성',
-    description: '감사 편지 쓰기, 기억에 남는 사진 찍기 등 감성적인 순간을 만들어요.',
-  },
-  {
-    id: 'connect',
-    label: '연결',
-    description: '오랫동안 연락 못 했던 사람에게 안부를 전하고 관계를 이어가요.',
-  },
-  {
-    id: 'environment',
-    label: '환경',
-    description: '텀블러 사용, 쓰레기 줍기 등 지구를 위한 작은 실천을 해요.',
-  },
-];
-
 export const PUSH_MESSAGES: string[] = [
   '오늘의 작은 선행이 누군가의 하루를 바꿀 수 있어요 🌟',
   '어제보다 조금 더 나은 나를 만날 시간이에요 ✨',
@@ -59,14 +36,6 @@ export const PUSH_MESSAGES: string[] = [
   '오늘 하루도 의미 있게 채워봐요. 랜데루가 함께할게요 💫',
   '당신의 일상 속 작은 변화가 시작될 시간이에요 🌱',
 ];
-
-export const HASHTAGS: Record<string, string[]> = {
-  kind: ['#친절', '#랜덤친절', '#선행', '#랜데루'],
-  sense: ['#감성', '#감사', '#일상기록', '#랜데루'],
-  connect: ['#연결', '#안부', '#따뜻한관계', '#랜데루'],
-  environment: ['#환경', '#친환경', '#지구사랑', '#랜데루'],
-  common: ['#오늘의루틴', '#랜덤데일리루틴', '#랜데루'],
-};
 
 export const ADMOB_REWARDED_AD_UNIT_ID = Platform.select({
   ios: 'ca-app-pub-5402672709504975/7787411749',
@@ -88,4 +57,4 @@ export const MediaType = {
   BOTH: 'both',
 } as const;
 
-export const MAX_VIDEO_DURATION = 15;
+export const MAX_VIDEO_DURATION = 10;

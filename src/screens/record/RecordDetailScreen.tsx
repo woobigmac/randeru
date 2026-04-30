@@ -7,7 +7,6 @@ import { RouteProp } from '@react-navigation/native';
 import { RecordsStackParamList } from '../../navigation/RecordsStackNavigator';
 import { Header } from '../../components/Header';
 import { Button } from '../../components/Button';
-import { Tag } from '../../components/Tag';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 
 type Props = {
@@ -15,13 +14,6 @@ type Props = {
   route: RouteProp<RecordsStackParamList, 'RecordDetail'>;
 };
 
-type TagColor = 'purple' | 'green' | 'orange' | 'gray';
-const TONE_COLORS: Record<string, TagColor> = {
-  kind: 'orange', sense: 'purple', connect: 'green', environment: 'gray',
-};
-const TONE_LABELS: Record<string, string> = {
-  kind: '친절', sense: '감성', connect: '연결', environment: '환경',
-};
 const formatDate = (d: string) => d.replace(/-/g, '.');
 
 export default function RecordDetailScreen({ navigation, route }: Props) {
@@ -52,14 +44,6 @@ export default function RecordDetailScreen({ navigation, route }: Props) {
             <Text style={styles.photoPlaceholderText}>미디어 없음</Text>
           </View>
         )}
-
-        {/* 카테고리 태그 */}
-        <View style={styles.tagRow}>
-          <Tag
-            label={TONE_LABELS[action.category] ?? action.category}
-            color={TONE_COLORS[action.category] ?? 'gray'}
-          />
-        </View>
 
         {/* 액션 제목 */}
         <Text style={styles.title}>{action.title}</Text>
@@ -106,13 +90,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.textTertiary,
   },
-  tagRow: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   title: {
     fontFamily: Fonts.handwriting,
     fontSize: 26,
     color: Colors.text,
     paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.sm,
+    marginTop: Spacing.md,
     marginBottom: Spacing.md,
     lineHeight: 38,
   },

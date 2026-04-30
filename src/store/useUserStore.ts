@@ -10,7 +10,7 @@ import {
   logoutApple,
   unlinkKakao,
 } from '../services/authService';
-import { User, Tone } from '../types';
+import { User } from '../types';
 import { DEFAULT_PUSH_TIME } from '../constants';
 
 const STORAGE_KEY_USER = 'user';
@@ -32,7 +32,6 @@ interface UserState {
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   setNickname: (nickname: string) => Promise<void>;
-  setSelectedTones: (tones: Tone[]) => Promise<void>;
   setAge: (age: number) => Promise<void>;
   setPushSettings: (enabled: boolean, time: string) => Promise<void>;
   updateProfile: (params: { nickname?: string; age?: number; imageUri?: string }) => Promise<void>;
@@ -95,7 +94,6 @@ export const useUserStore = create<UserState>((set, get) => ({
         kakaoId,
         profileImage,
         loginType: 'kakao',
-        selected_tones: [],
         push_enabled: true,
         push_time: DEFAULT_PUSH_TIME,
         created_at: new Date(),
@@ -136,7 +134,6 @@ export const useUserStore = create<UserState>((set, get) => ({
         user_id: docId,
         nickname: fullName ?? email?.split('@')[0] ?? '랜데루 유저',
         loginType: 'apple',
-        selected_tones: [],
         push_enabled: true,
         push_time: DEFAULT_PUSH_TIME,
         created_at: new Date(),
@@ -166,7 +163,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       user_id: generateUserId(),
       nickname: '게스트',
       loginType: 'guest',
-      selected_tones: [],
       push_enabled: true,
       push_time: DEFAULT_PUSH_TIME,
       created_at: new Date(),
@@ -206,7 +202,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       user_id: generateUserId(),
       nickname,
       loginType: 'guest',
-      selected_tones: [],
       push_enabled: true,
       push_time: DEFAULT_PUSH_TIME,
       created_at: new Date(),
@@ -218,18 +213,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
     } catch (e) {
       console.error('setNickname save error:', e);
-    }
-  },
-
-  setSelectedTones: async (tones) => {
-    const currentUser = get().user;
-    if (!currentUser) return;
-    const updated = { ...currentUser, selected_tones: tones };
-    set({ user: updated });
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
-    } catch (e) {
-      console.error('setSelectedTones save error:', e);
     }
   },
 

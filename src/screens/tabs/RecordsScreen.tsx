@@ -5,7 +5,6 @@ import {
   SectionList,
   TouchableOpacity,
   Image,
-  ScrollView,
   ActivityIndicator,
   StyleSheet,
   SectionListRenderItemInfo,
@@ -18,17 +17,12 @@ import { useUserStore } from '../../store/useUserStore';
 import { useRecordStore, RecordWithAction } from '../../store/useRecordStore';
 import { RecordsStackParamList } from '../../navigation/RecordsStackNavigator';
 import { MainTabParamList } from '../../navigation/MainTabNavigator';
-import { TONES, DAILY_SLOTS } from '../../constants';
+import { DAILY_SLOTS } from '../../constants';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 import { EmptyState } from '../../components/EmptyState';
-import { Tone, SlotId } from '../../types';
+import { SlotId } from '../../types';
 
 type RecordsNavProp = StackNavigationProp<RecordsStackParamList, 'RecordsList'>;
-
-const FILTER_OPTIONS: Array<{ id: 'all' | Tone; label: string }> = [
-  { id: 'all', label: '전체' },
-  ...TONES.map((t) => ({ id: t.id, label: t.label })),
-];
 
 const formatDate = (d: string) => d.replace(/-/g, '.');
 
@@ -59,7 +53,7 @@ export default function RecordsScreen() {
   const navigation = useNavigation<RecordsNavProp>();
   const tabNavigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const user = useUserStore((s) => s.user);
-  const { stats, isLoading, selectedFilter, loadRecords, setFilter, getFilteredRecords } =
+  const { stats, isLoading, loadRecords, getRecordsWithActions } =
     useRecordStore();
 
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
@@ -68,8 +62,7 @@ export default function RecordsScreen() {
     if (user?.user_id) loadRecords(user.user_id);
   }, [user?.user_id]);
 
-  const filteredRecords = getFilteredRecords();
-  const sections = groupByDate(filteredRecords);
+  const sections = groupByDate(getRecordsWithActions());
 
   const toggleDate = useCallback((date: string) => {
     setCollapsedDates((prev) => {
@@ -178,28 +171,6 @@ export default function RecordsScreen() {
         </View>
       </View>
 
-      {/* 필터 */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-      >
-        {FILTER_OPTIONS.map((opt) => {
-          const isSelected = selectedFilter === opt.id;
-          return (
-            <TouchableOpacity
-              key={opt.id}
-              onPress={() => setFilter(opt.id)}
-              style={[styles.filterPill, isSelected && styles.filterPillSelected]}
-            >
-              <Text style={[styles.filterText, isSelected && styles.filterTextSelected]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
       {/* 리스트 */}
       {isLoading ? (
         <View style={styles.center}>
@@ -241,12 +212,6 @@ const styles = StyleSheet.create({
   },
   statValue: { fontFamily: Fonts.handwriting, fontSize: 28, color: Colors.primary, marginBottom: 2 },
   statLabel: { fontSize: 12, color: Colors.textSecondary },
-
-  filterRow: { paddingHorizontal: Spacing.lg, gap: Spacing.sm, paddingBottom: Spacing.md },
-  filterPill: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: Radius.full, backgroundColor: Colors.surface },
-  filterPillSelected: { backgroundColor: Colors.primary },
-  filterText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
-  filterTextSelected: { color: Colors.white, fontWeight: '600' },
 
   sectionHeader: {
     flexDirection: 'row',

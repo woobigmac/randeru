@@ -13,6 +13,9 @@ import { db } from './firebase';
 import { Action, DailyRecord, DailySlotStatus, SlotId, Tone } from '../types';
 import { DAILY_SLOTS } from '../constants';
 
+const FIRESTORE_TIMEOUT_MS = 10000;
+const FIRESTORE_TIMEOUT_ERROR = 'firestore_timeout';
+
 const getTodayDate = (): string => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -51,13 +54,17 @@ export async function getTodayAction(userId: string): Promise<DailyRecord | null
  * 오늘 3개 슬롯의 상태를 반환한다.
  * - slot_id 없는 기존 record는 'morning'으로 처리한다.
  */
-const firestoreTimeout = <T>(promise: Promise<T>, ms = 10000): Promise<T> =>
+const firestoreTimeout = <T>(promise: Promise<T>, ms = FIRESTORE_TIMEOUT_MS): Promise<T> =>
   Promise.race([
     promise,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('firestore_timeout')), ms),
+      setTimeout(() => reject(new Error(FIRESTORE_TIMEOUT_ERROR)), ms),
     ),
   ]);
+
+export function isFirestoreTimeoutError(error: unknown): boolean {
+  return error instanceof Error && error.message === FIRESTORE_TIMEOUT_ERROR;
+}
 
 export async function getTodaySlots(userId: string): Promise<DailySlotStatus[]> {
   try {
@@ -77,7 +84,7 @@ export async function getTodaySlots(userId: string): Promise<DailySlotStatus[]> 
     const actionMap: Record<string, Action> = {};
     await Promise.all(
       actionIds.map(async (id) => {
-        const snap = await getDoc(doc(db, 'actions', id));
+        const snap = await firestoreTimeout(getDoc(doc(db, 'actions', id)));
         if (snap.exists()) actionMap[id] = { action_id: snap.id, ...snap.data() } as Action;
       }),
     );
@@ -120,7 +127,7 @@ export async function getTodaySlots(userId: string): Promise<DailySlotStatus[]> 
  */
 export async function getActionById(actionId: string): Promise<Action | null> {
   try {
-    const snap = await getDoc(doc(db, 'actions', actionId));
+    const snap = await firestoreTimeout(getDoc(doc(db, 'actions', actionId)));
     if (!snap.exists()) return null;
     return { action_id: snap.id, ...snap.data() } as Action;
   } catch (e) {
@@ -175,7 +182,7 @@ export async function acceptSlotAction(
     accepted_at: Timestamp.fromDate(now),
   };
 
-  const ref = await addDoc(collection(db, 'records'), payload);
+  const ref = await firestoreTimeout(addDoc(collection(db, 'records'), payload));
   return { record_id: ref.id, ...payload, accepted_at: now };
 }
 
@@ -195,10 +202,12 @@ export async function reshuffleAction(
   reshuffleCount: number,
 ): Promise<void> {
   try {
-    await updateDoc(doc(db, 'records', recordId), {
-      action_id: newAction.action_id,
-      reshuffle_count: reshuffleCount + 1,
-    });
+    await firestoreTimeout(
+      updateDoc(doc(db, 'records', recordId), {
+        action_id: newAction.action_id,
+        reshuffle_count: reshuffleCount + 1,
+      }),
+    );
   } catch (e) {
     console.error('reshuffleAction error:', e);
     throw e;

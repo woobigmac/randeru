@@ -43,7 +43,7 @@ export default function NicknameScreen({ navigation }: Props) {
     const err = validate(nickname);
     if (err) { setError(err); return; }
     await setNicknameStore(nickname.trim());
-    navigation.navigate('ToneSelect');
+    navigation.navigate('AgeSelect');
   };
 
   const isValid = nickname.length >= 2 && validate(nickname) === '';

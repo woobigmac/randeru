@@ -14,11 +14,26 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { Action, DailyRecord } from '../types';
 
+const FIRESTORE_TIMEOUT_MS = 10000;
+const STORAGE_TIMEOUT_MS = 20000;
+
+const serviceTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
+  Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label}_timeout`)), ms),
+    ),
+  ]);
+
 export async function createRecord(data: Omit<DailyRecord, 'record_id'>): Promise<string> {
-  const ref = await addDoc(collection(db, 'records'), {
-    ...data,
-    accepted_at: serverTimestamp(),
-  });
+  const ref = await serviceTimeout(
+    addDoc(collection(db, 'records'), {
+      ...data,
+      accepted_at: serverTimestamp(),
+    }),
+    FIRESTORE_TIMEOUT_MS,
+    'firestore',
+  );
   return ref.id;
 }
 
@@ -27,7 +42,11 @@ export async function updateRecord(
   data: Partial<DailyRecord>,
 ): Promise<void> {
   const ref = doc(db, 'records', recordId);
-  await updateDoc(ref, data as { [key: string]: unknown });
+  await serviceTimeout(
+    updateDoc(ref, data as { [key: string]: unknown }),
+    FIRESTORE_TIMEOUT_MS,
+    'firestore',
+  );
 }
 
 export async function getRecordsByUser(userId: string): Promise<DailyRecord[]> {
@@ -40,14 +59,6 @@ export async function getRecordsByUser(userId: string): Promise<DailyRecord[]> {
 /**
  * 해당 유저의 완료/공유된 전체 기록을 action_date 내림차순으로 반환한다.
  */
-const firestoreTimeout = <T>(promise: Promise<T>, ms = 10000): Promise<T> =>
-  Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('firestore_timeout')), ms),
-    ),
-  ]);
-
 export async function getUserRecords(userId: string): Promise<DailyRecord[]> {
   try {
     const q = query(
@@ -55,7 +66,7 @@ export async function getUserRecords(userId: string): Promise<DailyRecord[]> {
       where('user_id', '==', userId),
       where('status', 'in', ['completed', 'shared']),
     );
-    const snapshot = await firestoreTimeout(getDocs(q));
+    const snapshot = await serviceTimeout(getDocs(q), FIRESTORE_TIMEOUT_MS, 'firestore');
     const records = snapshot.docs.map((d) => ({ record_id: d.id, ...d.data() } as DailyRecord));
     return records.sort((a, b) => b.action_date.localeCompare(a.action_date));
   } catch (e) {
@@ -70,7 +81,11 @@ export async function getUserRecords(userId: string): Promise<DailyRecord[]> {
 export async function getRecordWithAction(
   record: DailyRecord,
 ): Promise<{ record: DailyRecord; action: Action }> {
-  const snap = await getDoc(doc(db, 'actions', record.action_id));
+  const snap = await serviceTimeout(
+    getDoc(doc(db, 'actions', record.action_id)),
+    FIRESTORE_TIMEOUT_MS,
+    'firestore',
+  );
   if (!snap.exists()) throw new Error(`Action not found: ${record.action_id}`);
   const action = { action_id: snap.id, ...snap.data() } as Action;
   return { record, action };
@@ -91,7 +106,7 @@ export async function getUserStats(
       where('user_id', '==', userId),
       where('status', 'in', ['completed', 'shared']),
     );
-    const snapshot = await firestoreTimeout(getDocs(q));
+    const snapshot = await serviceTimeout(getDocs(q), FIRESTORE_TIMEOUT_MS, 'firestore');
     const totalCount = snapshot.size;
 
     const dateSet = new Set(snapshot.docs.map((d) => (d.data() as DailyRecord).action_date));
@@ -130,8 +145,8 @@ export async function uploadMedia(
       : `videos/${userId}/${recordId}.mp4`;
   const metadata = { contentType: mediaType === 'photo' ? 'image/jpeg' : 'video/mp4' };
   const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, blob, metadata);
-  const url = await getDownloadURL(storageRef);
+  await serviceTimeout(uploadBytes(storageRef, blob, metadata), STORAGE_TIMEOUT_MS, 'storage');
+  const url = await serviceTimeout(getDownloadURL(storageRef), FIRESTORE_TIMEOUT_MS, 'storage');
   return { url, thumbnailUrl: url };
 }
 
@@ -143,9 +158,13 @@ export async function markAsShared(
   shareChannel: string,
 ): Promise<void> {
   const ref = doc(db, 'records', recordId);
-  await updateDoc(ref, {
-    status: 'shared',
-    share_channel: shareChannel,
-    shared_at: Timestamp.fromDate(new Date()),
-  });
+  await serviceTimeout(
+    updateDoc(ref, {
+      status: 'shared',
+      share_channel: shareChannel,
+      shared_at: Timestamp.fromDate(new Date()),
+    }),
+    FIRESTORE_TIMEOUT_MS,
+    'firestore',
+  );
 }

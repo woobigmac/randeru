@@ -15,18 +15,10 @@ type Props = {
   route: RouteProp<HomeStackParamList, 'ActionDetail'>;
 };
 
-type TagColor = 'purple' | 'green' | 'orange' | 'gray';
-
 const DIFFICULTY_LABEL: Record<string, string> = {
   easy: '쉬움',
   medium: '보통',
   hard: '어려움',
-};
-const TONE_LABELS: Record<string, string> = {
-  kind: '친절', sense: '감성', connect: '연결', environment: '환경',
-};
-const TONE_COLORS: Record<string, TagColor> = {
-  kind: 'orange', sense: 'purple', connect: 'green', environment: 'gray',
 };
 
 export default function ActionDetailScreen({ navigation, route }: Props) {
@@ -42,7 +34,6 @@ export default function ActionDetailScreen({ navigation, route }: Props) {
 
         {/* 태그 행 */}
         <View style={styles.tagRow}>
-          <Tag label={TONE_LABELS[action.category] ?? action.category} color={TONE_COLORS[action.category] ?? 'gray'} />
           <Tag label={DIFFICULTY_LABEL[action.difficulty] ?? action.difficulty} color="gray" />
           <Tag label={`${action.estimated_time}분`} color="purple" />
           <Tag label={`#${action.place_tag}`} color="green" />
@@ -58,7 +49,7 @@ export default function ActionDetailScreen({ navigation, route }: Props) {
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>어떻게 하면 되나요?</Text>
           <Text style={styles.bodyText}>
-            {`1. 주변을 잠깐 둘러보세요.\n2. 지금 바로 실천할 수 있어요. 특별한 준비가 필요 없어요.\n3. 완료 후 사진 한 장을 찍어 기록해보세요.`}
+            {`1. 주변을 잠깐 둘러보세요.\n2. 지금 바로 실천할 수 있어요. 특별한 준비가 필요 없어요.\n3. 완료 후 사진이나 10초 이내 영상으로 기록해보세요.`}
           </Text>
         </View>
 
