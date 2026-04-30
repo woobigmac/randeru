@@ -7,7 +7,6 @@ import {
   ScrollView,
   Modal,
   StyleSheet,
-  Linking,
   SafeAreaView as RNSafeAreaView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -161,7 +160,7 @@ export default function MyPageScreen({ navigation }: Props) {
           <MenuItem icon="🔔" label="알림 설정" onPress={() => navigation.navigate('NotificationSetting')} />
           <MenuItem icon="📄" label="이용약관" onPress={() => setPolicyModal('terms')} />
           <MenuItem icon="🔐" label="개인정보처리방침" onPress={() => setPolicyModal('privacy')} />
-          <MenuItem icon="💌" label="문의하기" onPress={() => Linking.openURL('mailto:support@randeru.app')} />
+          <MenuItem icon="💌" label="문의하기" onPress={() => navigation.navigate('Inquiry')} />
           <MenuItem icon="ℹ️" label={`앱 버전 ${APP_VERSION}`} isStatic />
           <MenuItem icon="🚪" label="로그아웃" onPress={handleLogout} isDanger />
           <MenuItem icon="✕" label="탈퇴하기" onPress={handleDeleteAccount} isDanger isLast />
