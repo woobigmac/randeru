@@ -15,7 +15,7 @@ import { useUserStore } from '../../store/useUserStore';
 import { useActionStore } from '../../store/useActionStore';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { MainTabParamList } from '../../navigation/MainTabNavigator';
-import { DAILY_SLOTS } from '../../constants';
+import { DAILY_SLOTS, MAX_RESHUFFLE_COUNT } from '../../constants';
 import { DailySlotStatus, SlotId } from '../../types';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 import { ActionCard } from '../../components/ActionCard';
@@ -44,6 +44,7 @@ export default function HomeScreen({ navigation }: Props) {
     loadTodaySlots,
     receiveSlotAction,
     setActiveSlot,
+    reshuffleWithAd,
   } = useActionStore();
 
   useEffect(() => {
@@ -57,9 +58,9 @@ export default function HomeScreen({ navigation }: Props) {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.centered]}>
+      <SafeAreaView style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -133,6 +134,9 @@ export default function HomeScreen({ navigation }: Props) {
               receiveSlotAction(user.user_id, activeSlotId);
             }
           }}
+          onReshuffle={() => {
+            if (user?.user_id) reshuffleWithAd(user.user_id);
+          }}
           onDetail={() => {
             if (activeSlot?.action) {
               navigation.navigate('ActionDetail', { action: activeSlot.action });
@@ -176,13 +180,14 @@ type SlotContentProps = {
   slotId: SlotId | null;
   isAdLoading: boolean;
   onReceive: () => void;
+  onReshuffle: () => void;
   onDetail: () => void;
   onComplete: () => void;
   onShare: () => void;
   onRecords: () => void;
 };
 
-function SlotContent({ slot, slotId, isAdLoading, onReceive, onDetail, onComplete, onShare, onRecords }: SlotContentProps) {
+function SlotContent({ slot, slotId, isAdLoading, onReceive, onReshuffle, onDetail, onComplete, onShare, onRecords }: SlotContentProps) {
   if (!slot || !slotId) {
     return (
       <View style={styles.centered}>
@@ -224,6 +229,10 @@ function SlotContent({ slot, slotId, isAdLoading, onReceive, onDetail, onComplet
 
   // accepted
   if (slot.status === 'accepted' && slot.action) {
+    const reshuffleCount = slot.record?.reshuffle_count ?? 0;
+    const canReshuffle = reshuffleCount < MAX_RESHUFFLE_COUNT;
+    const reshuffleLeft = MAX_RESHUFFLE_COUNT - reshuffleCount;
+
     return (
       <View style={styles.slotContent}>
         <ActionCard
@@ -242,6 +251,15 @@ function SlotContent({ slot, slotId, isAdLoading, onReceive, onDetail, onComplet
           variant="secondary"
           style={{ marginTop: Spacing.sm }}
         />
+        {canReshuffle && (
+          <Button
+            label={isAdLoading ? '광고 로딩 중...' : `다시뽑기 (${reshuffleLeft}회 남음)`}
+            onPress={onReshuffle}
+            variant="text"
+            style={{ marginTop: Spacing.sm }}
+            disabled={isAdLoading}
+          />
+        )}
       </View>
     );
   }

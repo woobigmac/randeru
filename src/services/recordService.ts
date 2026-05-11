@@ -11,6 +11,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { db, storage } from './firebase';
 import { Action, DailyRecord } from '../types';
 
@@ -129,7 +130,7 @@ export async function getUserStats(
 /**
  * 사진 또는 영상을 Firebase Storage에 업로드하고 URL을 반환한다.
  * - 사진: photos/{userId}/{recordId}.jpg
- * - 영상: videos/{userId}/{recordId}.mp4  (thumbnailUrl은 추후 별도 생성)
+ * - 영상: videos/{userId}/{recordId}.mp4 + thumbnails/{userId}/{recordId}.jpg
  */
 export async function uploadMedia(
   userId: string,
@@ -147,7 +148,32 @@ export async function uploadMedia(
   const storageRef = ref(storage, path);
   await serviceTimeout(uploadBytes(storageRef, blob, metadata), STORAGE_TIMEOUT_MS, 'storage');
   const url = await serviceTimeout(getDownloadURL(storageRef), FIRESTORE_TIMEOUT_MS, 'storage');
-  return { url, thumbnailUrl: url };
+
+  if (mediaType !== 'video') {
+    return { url, thumbnailUrl: url };
+  }
+
+  // 영상 첫 프레임으로 썸네일 생성 후 별도 업로드
+  try {
+    const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(uri, { time: 0 });
+    const thumbResponse = await fetch(thumbUri);
+    const thumbBlob = await thumbResponse.blob();
+    const thumbRef = ref(storage, `thumbnails/${userId}/${recordId}.jpg`);
+    await serviceTimeout(
+      uploadBytes(thumbRef, thumbBlob, { contentType: 'image/jpeg' }),
+      STORAGE_TIMEOUT_MS,
+      'storage',
+    );
+    const thumbnailUrl = await serviceTimeout(
+      getDownloadURL(thumbRef),
+      FIRESTORE_TIMEOUT_MS,
+      'storage',
+    );
+    return { url, thumbnailUrl };
+  } catch (e) {
+    console.warn('thumbnail generation failed, falling back to video url:', e);
+    return { url, thumbnailUrl: url };
+  }
 }
 
 /**

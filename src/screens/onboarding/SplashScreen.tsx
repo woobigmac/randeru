@@ -16,7 +16,7 @@ export default function SplashScreen() {
 
   useEffect(() => {
     const init = async () => {
-      await Promise.all([loadUser(), delay(2500)]);
+      await Promise.all([loadUser(), delay(3500)]);
       logAppOpen();
 
       const { user, isOnboardingComplete } = useUserStore.getState();

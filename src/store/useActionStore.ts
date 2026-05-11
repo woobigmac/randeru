@@ -177,7 +177,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
 
     const reshuffleCount = activeSlot.record.reshuffle_count ?? 0;
     if (reshuffleCount >= MAX_RESHUFFLE_COUNT) return;
-    if (reshuffleCount >= FREE_RESHUFFLE_COUNT) return;
+    if (reshuffleCount >= FREE_RESHUFFLE_COUNT) return; // 유료 구간은 reshuffleWithAd 사용
 
     set({ isLoading: true, error: null });
     try {
@@ -218,7 +218,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
     try {
       const rewarded = await showRewardedAd();
       if (!rewarded) {
-        Alert.alert('광고 미완료', '광고를 끝까지 시청해야 추가 재추첨이 가능해요.');
+        Alert.alert('재추첨 불가', '광고를 끝까지 시청하거나\n네트워크 연결을 확인해 주세요.');
         return;
       }
 

@@ -37,11 +37,11 @@ export default function NotificationSettingScreen() {
         const granted = await requestPermission();
         if (!granted) return;
         await scheduleDailySlotNotifications(slots);
-        await setPushSettings(true, user?.push_time ?? '09:00');
+        await setPushSettings(true, user?.push_time ?? '09:00', slots);
         setMasterEnabled(true);
       } else {
         await cancelAllNotifications();
-        await setPushSettings(false, user?.push_time ?? '09:00');
+        await setPushSettings(false, user?.push_time ?? '09:00', slots);
         setMasterEnabled(false);
       }
     } catch (e) {
@@ -57,6 +57,7 @@ export default function NotificationSettingScreen() {
     if (masterEnabled) {
       try {
         await scheduleDailySlotNotifications(updated);
+        await setPushSettings(masterEnabled, user?.push_time ?? '09:00', updated);
       } catch (e) {
         console.error('slotToggle error:', e);
       }

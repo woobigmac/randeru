@@ -19,6 +19,12 @@
       "buildNumber": "4",
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "instagram",
+          "instagram-stories"
+        ]
+      },
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -61,7 +67,15 @@
         }
       ],
       "./plugins/withKakaoInit",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {

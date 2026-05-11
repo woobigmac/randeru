@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Linking,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -33,6 +34,21 @@ type Props = {
 
 const SHARE_HASHTAGS = '#랜데루 #오늘의인간다움 #하루한번작은행동';
 const APP_ICON = require('../../../assets/icon.png');
+const INSTAGRAM_URL = 'instagram://app';
+const INSTAGRAM_STORIES_URL = 'instagram-stories://share';
+
+// ─── 아날로그 카메라 타임스탬프 포맷 ────────────────────────────────────────
+function formatTimestamp(date: Date | string | undefined): string {
+  if (!date) return '';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '';
+  const yy = String(d.getFullYear()).slice(2);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${yy}.${mm}.${dd}  ${hh}:${min}`;
+}
 
 // ─── 공유 카드 ──────────────────────────────────────────────────────────────
 type ShareCardProps = {
@@ -41,13 +57,15 @@ type ShareCardProps = {
   memo?: string;
   mediaUrl?: string;
   mediaType?: 'photo' | 'video';
+  completedAt?: Date | string;
   onImageLoaded?: () => void;
 };
 
 const ShareCard = React.forwardRef<ViewShot, ShareCardProps>(
-  ({ title, copyTemplate, memo, mediaUrl, mediaType, onImageLoaded }, ref) => {
+  ({ title, copyTemplate, memo, mediaUrl, mediaType, completedAt, onImageLoaded }, ref) => {
     const [imageError, setImageError] = useState(false);
     const showImage = !!mediaUrl && !imageError;
+    const timestamp = formatTimestamp(completedAt);
 
     return (
       <ViewShot ref={ref} options={{ format: 'jpg', quality: 0.95 }}>
@@ -88,10 +106,15 @@ const ShareCard = React.forwardRef<ViewShot, ShareCardProps>(
           <Text style={cardStyles.copy}>{copyTemplate}</Text>
           <Text style={cardStyles.hashtag}>{SHARE_HASHTAGS}</Text>
 
-          {/* 5. 워터마크 (우하단) */}
-          <View style={cardStyles.watermarkRow}>
-            <Image source={APP_ICON} style={cardStyles.watermarkIcon} />
-            <Text style={cardStyles.watermarkText}>랜데루</Text>
+          {/* 5. 워터마크 + 타임스탬프 */}
+          <View style={cardStyles.bottomRow}>
+            <View style={cardStyles.watermarkRow}>
+              <Image source={APP_ICON} style={cardStyles.watermarkIcon} />
+              <Text style={cardStyles.watermarkText}>랜데루</Text>
+            </View>
+            {!!timestamp && (
+              <Text style={cardStyles.timestamp}>{timestamp}</Text>
+            )}
           </View>
         </View>
       </ViewShot>
@@ -145,10 +168,14 @@ const cardStyles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   hashtag: { fontSize: 12, color: Colors.textTertiary, marginBottom: Spacing.md },
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
   watermarkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
     gap: 4,
   },
   watermarkIcon: {
@@ -160,6 +187,13 @@ const cardStyles = StyleSheet.create({
     fontFamily: Fonts.handwriting,
     fontSize: 12,
     color: Colors.textTertiary,
+  },
+  timestamp: {
+    fontSize: 11,
+    color: '#E8871E',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '700',
+    letterSpacing: 1.2,
   },
 });
 
@@ -203,8 +237,17 @@ export default function ShareScreen({ navigation, route }: Props) {
   const cardRef = useRef<ViewShot>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [imageReady, setImageReady] = useState(false);
+  const isMounted = useRef(true);
+
+  React.useEffect(() => {
+    return () => { isMounted.current = false; };
+  }, []);
 
   const mediaUrl = record.media_url ?? record.photo_url;
+  // 영상인 경우 카드 미리보기에는 썸네일 이미지를 사용
+  const cardPreviewUrl = record.media_type === 'video'
+    ? (record.thumbnail_url !== record.media_url ? record.thumbnail_url : undefined)
+    : mediaUrl;
 
   /** 이미지 로드 완료 혹은 이미지 없음 시 호출 */
   const handleImageLoaded = () => setImageReady(true);
@@ -213,12 +256,12 @@ export default function ShareScreen({ navigation, route }: Props) {
   const captureCard = (): Promise<string> =>
     new Promise((resolve, reject) => {
       const tryCapture = async () => {
+        if (!isMounted.current) { reject(new Error('unmounted')); return; }
         try {
           if (!cardRef.current) {
             reject(new Error('share_card_not_ready'));
             return;
           }
-
           const uri = await captureRef(cardRef.current, {
             format: 'jpg',
             quality: 0.95,
@@ -236,6 +279,7 @@ export default function ShareScreen({ navigation, route }: Props) {
         // 최대 3초 대기
         let waited = 0;
         const interval = setInterval(() => {
+          if (!isMounted.current) { clearInterval(interval); reject(new Error('unmounted')); return; }
           waited += 100;
           if (imageReady || !mediaUrl || waited >= 3000) {
             clearInterval(interval);
@@ -245,30 +289,36 @@ export default function ShareScreen({ navigation, route }: Props) {
       }
     });
 
-  const saveCapturedImage = async (uri: string) => {
+  const requestLibraryPermission = async (): Promise<boolean> => {
     const permission = await MediaLibrary.requestPermissionsAsync(false);
-    const canSave =
+    const granted =
       permission.status === 'granted' ||
       (permission as MediaLibrary.PermissionResponse & { accessPrivileges?: string })
         .accessPrivileges === 'limited';
-
-    if (!canSave) {
-      Alert.alert('권한 필요', '이미지를 저장하려면 갤러리 접근 권한이 필요해요.');
-      return false;
+    if (!granted) {
+      Alert.alert('권한 필요', '갤러리 접근 권한이 필요해요.');
     }
+    return granted;
+  };
 
+  // 갤러리 저장: 항상 카드 스냅샷 이미지로 저장
+  const saveToLibrary = async (cardUri?: string): Promise<boolean> => {
+    const granted = await requestLibraryPermission();
+    if (!granted) return false;
+    const uri = cardUri ?? (await captureCard());
     await MediaLibrary.createAssetAsync(uri);
     return true;
   };
 
-  const shareCapturedImage = async (uri: string) => {
+  // OS 공유 시트: 항상 카드 스냅샷 이미지로 공유
+  const shareMedia = async (): Promise<boolean> => {
+    const uri = await captureCard();
     const available = await Sharing.isAvailableAsync();
     if (!available) {
-      const saved = await saveCapturedImage(uri);
+      const saved = await saveToLibrary(uri);
       if (saved) Alert.alert('저장 완료', '공유 이미지를 갤러리에 저장했어요.');
       return saved;
     }
-
     await Sharing.shareAsync(uri, {
       mimeType: 'image/jpeg',
       dialogTitle: '랜데루 공유하기',
@@ -287,25 +337,40 @@ export default function ShareScreen({ navigation, route }: Props) {
     }
   };
 
-  // ── 인스타그램 ────────────────────────────────────────────────────────────
+  // ── 인스타그램 (항상 카드 스냅샷 이미지로 공유) ─────────────────────────
   const handleInstagram = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
       await showRewardedAd();
       const uri = await captureCard();
-      const saved = await saveCapturedImage(uri);
+      const saved = await saveToLibrary(uri);
       if (!saved) return;
 
-      const instagramUrl = 'instagram://app';
-      const canOpen = await Linking.canOpenURL(instagramUrl);
-      if (canOpen) {
-        Alert.alert('이미지가 저장됐어요', '인스타그램에서 저장된 이미지를 선택해 공유해주세요.', [
-          { text: '인스타그램 열기', onPress: () => Linking.openURL(instagramUrl) },
-          { text: '닫기', style: 'cancel' },
-        ]);
+      const canOpenStories = await Linking.canOpenURL(INSTAGRAM_STORIES_URL);
+      const canOpenInstagram = await Linking.canOpenURL(INSTAGRAM_URL);
+      const instagramUrl = canOpenStories ? INSTAGRAM_STORIES_URL : INSTAGRAM_URL;
+
+      if (canOpenStories || canOpenInstagram) {
+        Alert.alert(
+          '이미지가 저장됐어요',
+          '인스타그램에서 방금 저장된 카드 이미지를 선택해 공유해주세요.',
+          [
+            { text: '인스타그램 열기', onPress: () => Linking.openURL(instagramUrl) },
+            { text: '닫기', style: 'cancel' },
+          ],
+        );
       } else {
-        await shareCapturedImage(uri);
+        const available = await Sharing.isAvailableAsync();
+        if (available) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'image/jpeg',
+            dialogTitle: '랜데루 공유하기',
+            UTI: 'public.jpeg',
+          });
+        } else {
+          Alert.alert('저장 완료', '카드 이미지가 갤러리에 저장됐어요.');
+        }
       }
       await finalizeShare('instagram');
     } catch (e) {
@@ -322,8 +387,7 @@ export default function ShareScreen({ navigation, route }: Props) {
     setIsProcessing(true);
     try {
       await showRewardedAd();
-      const uri = await captureCard();
-      const shared = await shareCapturedImage(uri);
+      const shared = await shareMedia();
       if (!shared) return;
       await finalizeShare('share_sheet');
     } catch (e) {
@@ -334,55 +398,15 @@ export default function ShareScreen({ navigation, route }: Props) {
     }
   };
 
-  // ── 스레드 ────────────────────────────────────────────────────────────────
-  const handleThreads = async () => {
-    if (isProcessing) return;
-    setIsProcessing(true);
-    try {
-      await showRewardedAd();
-      const uri = await captureCard();
-
-      const saved = await saveCapturedImage(uri);
-      if (!saved) return;
-
-      const threadsUrl = 'threads://';
-      const canOpen = await Linking.canOpenURL(threadsUrl);
-      if (canOpen) {
-        Alert.alert('이미지가 저장됐어요. 스레드 앱에서 업로드해주세요', '', [
-          { text: '스레드 열기', onPress: () => Linking.openURL(threadsUrl) },
-          { text: '닫기', style: 'cancel' },
-        ]);
-      } else {
-        Alert.alert('스레드 앱 없음', '앱 스토어로 이동할까요?', [
-          {
-            text: '앱스토어 이동',
-            onPress: () =>
-              Linking.openURL('https://apps.apple.com/app/threads/id6446901002'),
-          },
-          { text: '취소', style: 'cancel' },
-        ]);
-        return;
-      }
-      await finalizeShare('threads');
-    } catch (e) {
-      console.error('handleThreads error:', e);
-      Alert.alert('오류', '공유 중 문제가 발생했어요. 다시 시도해주세요.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // ── 이미지 저장 ───────────────────────────────────────────────────────────
+  // ── 미디어 저장 ───────────────────────────────────────────────────────────
   const handleSaveImage = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
       await showRewardedAd();
-      const uri = await captureCard();
-
-      const saved = await saveCapturedImage(uri);
+      const saved = await saveToLibrary();
       if (!saved) return;
-      Alert.alert('저장 완료', '이미지가 갤러리에 저장됐어요');
+      Alert.alert('저장 완료', '카드 이미지가 갤러리에 저장됐어요.');
       await finalizeShare('save_image');
     } catch (e) {
       console.error('handleSaveImage error:', e);
@@ -406,8 +430,9 @@ export default function ShareScreen({ navigation, route }: Props) {
             title={action.title}
             copyTemplate={action.share_copy_template}
             memo={record.memo}
-            mediaUrl={mediaUrl}
+            mediaUrl={cardPreviewUrl}
             mediaType={record.media_type}
+            completedAt={record.completed_at}
             onImageLoaded={handleImageLoaded}
           />
         </View>
@@ -433,12 +458,7 @@ export default function ShareScreen({ navigation, route }: Props) {
             disabled={isProcessing}
           />
           <ShareOptionCard
-            label="스레드에 공유"
-            onPress={handleThreads}
-            disabled={isProcessing}
-          />
-          <ShareOptionCard
-            label="이미지 저장하기"
+            label="카드 이미지 저장하기"
             onPress={handleSaveImage}
             disabled={isProcessing}
           />

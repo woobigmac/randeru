@@ -29,6 +29,15 @@ function isSlotAvailable(hour: number, minute: number): boolean {
   return now.getHours() > hour || (now.getHours() === hour && now.getMinutes() >= minute);
 }
 
+/** 다음 슬롯이 열렸는지 확인 — 열렸으면 이전 슬롯은 미완료 시 잠금 처리. */
+function isSlotExpired(slotId: SlotId): boolean {
+  const now = new Date();
+  const totalMin = now.getHours() * 60 + now.getMinutes();
+  if (slotId === 'morning') return totalMin >= 12 * 60 + 30; // 점심 오픈 시
+  if (slotId === 'lunch') return totalMin >= 19 * 60;         // 저녁 오픈 시
+  return false;
+}
+
 /**
  * 오늘 날짜로 해당 유저의 기록을 조회한다. (하위 호환 — 단일 record)
  */
@@ -95,12 +104,17 @@ export async function getTodaySlots(userId: string): Promise<DailySlotStatus[]> 
       const action = record ? (actionMap[record.action_id] ?? null) : null;
       const available = isSlotAvailable(slot.hour, slot.minute);
 
+      const isCompleted = record?.status === 'completed' || record?.status === 'shared';
+      const expired = isSlotExpired(slot.id);
+
       let status: DailySlotStatus['status'];
       if (!available) {
         status = 'locked';
+      } else if (expired && !isCompleted) {
+        status = 'locked';
       } else if (!record) {
         status = 'available';
-      } else if (record.status === 'completed' || record.status === 'shared') {
+      } else if (isCompleted) {
         status = 'completed';
       } else {
         status = 'accepted';
@@ -110,15 +124,19 @@ export async function getTodaySlots(userId: string): Promise<DailySlotStatus[]> 
     });
   } catch (e) {
     console.error('getTodaySlots error:', e);
-    return DAILY_SLOTS.map((slot) => ({
-      slot_id: slot.id,
-      label: slot.label,
-      time: slot.time,
-      isAvailable: isSlotAvailable(slot.hour, slot.minute),
-      record: null,
-      action: null,
-      status: isSlotAvailable(slot.hour, slot.minute) ? 'available' : 'locked',
-    }));
+    return DAILY_SLOTS.map((slot) => {
+      const available = isSlotAvailable(slot.hour, slot.minute);
+      const expired = isSlotExpired(slot.id);
+      return {
+        slot_id: slot.id,
+        label: slot.label,
+        time: slot.time,
+        isAvailable: available,
+        record: null,
+        action: null,
+        status: (!available || expired) ? 'locked' : 'available',
+      };
+    });
   }
 }
 

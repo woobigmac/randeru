@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import mobileAds from 'react-native-google-mobile-ads';
 import RootNavigator from './src/navigation/RootNavigator';
 import { runSeedActions, runSeedSense, runSeedKind, runSeedConnect, runSeedEnvironment } from './src/services/seedActions';
 
@@ -15,6 +16,12 @@ export default function App() {
   const [fontsLoaded] = useFonts({
     KotraHope: require('./assets/fonts/KOTRA_SONGEULSSI.ttf'),
   });
+
+  useEffect(() => {
+    mobileAds().initialize().catch((e) => {
+      console.warn('mobileAds initialize error:', e);
+    });
+  }, []);
 
   useEffect(() => {
     if (__DEV__) {

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -45,14 +45,35 @@ function VideoPreview({ uri }: VideoPreviewProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  const handleStatus = (status: AVPlaybackStatus) => {
-    if (status.isLoaded) {
-      setPosition((status.positionMillis ?? 0) / 1000);
-      setDuration((status.durationMillis ?? 0) / 1000);
-      setIsPlaying(status.isPlaying);
+  const positionRef = useRef(0);
+  const durationRef = useRef(0);
+  const isPlayingRef = useRef(false);
+
+  const handleStatus = useCallback((status: AVPlaybackStatus) => {
+    if (!status.isLoaded) return;
+
+    const newPos = (status.positionMillis ?? 0) / 1000;
+    const newDur = (status.durationMillis ?? 0) / 1000;
+    const newPlaying = status.isPlaying;
+
+    if (!isLoaded) setIsLoaded(true);
+
+    // 값이 실제로 변경될 때만 setState
+    if (Math.abs(newPos - positionRef.current) >= 0.5) {
+      positionRef.current = newPos;
+      setPosition(newPos);
     }
-  };
+    if (newDur !== durationRef.current) {
+      durationRef.current = newDur;
+      setDuration(newDur);
+    }
+    if (newPlaying !== isPlayingRef.current) {
+      isPlayingRef.current = newPlaying;
+      setIsPlaying(newPlaying);
+    }
+  }, [isLoaded]);
 
   const togglePlay = async () => {
     if (isPlaying) {
@@ -70,8 +91,14 @@ function VideoPreview({ uri }: VideoPreviewProps) {
         style={vpStyles.video}
         resizeMode={ResizeMode.COVER}
         isLooping
+        progressUpdateIntervalMillis={500}
         onPlaybackStatusUpdate={handleStatus}
       />
+      {!isLoaded && (
+        <View style={vpStyles.loadingOverlay}>
+          <Text style={vpStyles.loadingText}>영상 로딩 중...</Text>
+        </View>
+      )}
       {/* 컨트롤 오버레이 */}
       <View style={vpStyles.overlay}>
         <TouchableOpacity onPress={togglePlay} style={vpStyles.playBtn} activeOpacity={0.8}>
@@ -90,6 +117,13 @@ function VideoPreview({ uri }: VideoPreviewProps) {
 const vpStyles = StyleSheet.create({
   wrapper: { width: '100%', height: 300, borderRadius: Radius.lg, overflow: 'hidden', marginBottom: Spacing.md },
   video: { width: '100%', height: '100%' },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: { fontSize: 13, color: Colors.textTertiary },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
@@ -166,6 +200,7 @@ export default function PhotoScreen({ navigation, route }: Props) {
   const [memo, setMemo] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isMemoFocused, setIsMemoFocused] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
 
   // 탭 변경 시 미디어 초기화
   const handleTabChange = (tab: 'photo' | 'video') => {
@@ -230,6 +265,10 @@ export default function PhotoScreen({ navigation, route }: Props) {
   // ─── 저장 ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (isSaving) return;
+    if (!mediaUri) {
+      Alert.alert('미디어 필요', '사진 또는 영상을 먼저 추가해주세요.');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -262,35 +301,17 @@ export default function PhotoScreen({ navigation, route }: Props) {
     }
   };
 
-  const handleSkip = async () => {
-    if (isSaving) return;
-
-    setIsSaving(true);
-    try {
-      const completedRecord: Partial<DailyRecord> = {
-        status: 'completed',
-        photo_uploaded: false,
-        completed_at: new Date(),
-      };
-      await updateRecord(recordId, completedRecord);
-      setActionCompleted(completedRecord);
-      logActionCompleted(action.action_id, action.category, false);
-      navigation.navigate('Complete', { recordId });
-    } catch (e) {
-      console.error('handleSkip error:', e);
-      Alert.alert('오류', '저장 중 문제가 발생했어요.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   // ─── 렌더 ──────────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <SafeAreaView style={styles.container}>
         <Header title="사진 & 영상" showBack />
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <TabBar activeTab={activeTab} onChange={handleTabChange} />
 
           {/* ── 사진 UI ── */}
@@ -333,27 +354,24 @@ export default function PhotoScreen({ navigation, route }: Props) {
           <TextInput
             value={memo}
             onChangeText={setMemo}
-            onFocus={() => setIsMemoFocused(true)}
+            onFocus={() => {
+              setIsMemoFocused(true);
+              setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+            }}
             onBlur={() => setIsMemoFocused(false)}
             placeholder="오늘의 액션은 어땠나요?"
             placeholderTextColor={Colors.textTertiary}
             maxLength={100}
             multiline
+            scrollEnabled={false}
             style={[styles.memoInput, isMemoFocused && styles.memoInputFocused]}
           />
-        </ScrollView>
 
-        {/* 하단 고정 */}
-        <View style={styles.buttonArea}>
-          <Button label="저장하기" onPress={handleSave} loading={isSaving} />
-          <Button
-            label="미디어 없이 기록만 남기기"
-            onPress={handleSkip}
-            variant="text"
-            disabled={isSaving}
-            style={{ marginTop: Spacing.md }}
-          />
-        </View>
+          {/* 저장 버튼 */}
+          <View style={styles.buttonArea}>
+            <Button label="저장하기" onPress={handleSave} loading={isSaving} />
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -361,7 +379,7 @@ export default function PhotoScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scroll: { padding: Spacing.lg, paddingBottom: Spacing.md },
+  scroll: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
   preview: { width: '100%', height: 300, borderRadius: Radius.lg, marginBottom: Spacing.md },
   placeholder: {
     width: '100%',
@@ -392,5 +410,5 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   memoInputFocused: { borderColor: Colors.primary },
-  buttonArea: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
+  buttonArea: { marginTop: Spacing.lg },
 });

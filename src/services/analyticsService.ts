@@ -85,6 +85,19 @@ export const logOnboardingComplete = (age: number): void => {
   );
 };
 
+/** 프로필 수정 완료 시 */
+export const logProfileUpdated = (
+  updatedFields: string[],
+  hasProfileImage: boolean,
+): void => {
+  void safe(() =>
+    analytics().logEvent('profile_updated', {
+      updated_fields: updatedFields.join(','),
+      has_profile_image: hasProfileImage,
+    }),
+  );
+};
+
 /** 푸시 알림 수신 시 */
 export const logPushNotificationReceived = (): void => {
   void safe(() => analytics().logEvent('push_notification_received'));

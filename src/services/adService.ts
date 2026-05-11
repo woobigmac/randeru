@@ -5,13 +5,13 @@ import {
 } from 'react-native-google-mobile-ads';
 import { ADMOB_REWARDED_AD_UNIT_ID } from '../constants';
 
-/**
- * 리워드 광고를 로드하고 준비된 RewardedAd 인스턴스를 반환한다.
- * 로드 실패 시 에러를 throw한다.
- */
+const adUnitId = __DEV__
+  ? 'ca-app-pub-3940256099942544/1712485313'
+  : ADMOB_REWARDED_AD_UNIT_ID;
+
 export function loadRewardedAd(): Promise<RewardedAd> {
   return new Promise((resolve, reject) => {
-    const rewarded = RewardedAd.createForAdRequest(ADMOB_REWARDED_AD_UNIT_ID, {
+    const rewarded = RewardedAd.createForAdRequest(adUnitId, {
       requestNonPersonalizedAdsOnly: true,
     });
 
@@ -19,6 +19,7 @@ export function loadRewardedAd(): Promise<RewardedAd> {
       RewardedAdEventType.LOADED,
       () => {
         unsubscribeLoaded();
+        unsubscribeError();
         resolve(rewarded);
       },
     );
@@ -26,6 +27,7 @@ export function loadRewardedAd(): Promise<RewardedAd> {
     const unsubscribeError = rewarded.addAdEventListener(
       AdEventType.ERROR,
       (error) => {
+        unsubscribeLoaded();
         unsubscribeError();
         reject(error);
       },
@@ -35,31 +37,41 @@ export function loadRewardedAd(): Promise<RewardedAd> {
   });
 }
 
-/**
- * 리워드 광고를 로드하고 시청한다.
- * - 광고 시청 완료(보상 획득) 시 true 반환
- * - 광고 스킵, 로드 실패, 에러 시 false 반환 (앱 크래시 방지)
- * - false를 반환해도 공유는 정상 진행해야 함 (광고는 수익용)
- */
 export async function showRewardedAd(): Promise<boolean> {
   try {
     const rewarded = await loadRewardedAd();
 
     return new Promise((resolve) => {
       let rewardEarned = false;
+      let settled = false;
+
+      const settle = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
 
       rewarded.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => {
         rewardEarned = true;
       });
 
       rewarded.addAdEventListener(AdEventType.CLOSED, () => {
-        resolve(rewardEarned);
+        settle(rewardEarned);
       });
 
-      rewarded.show();
+      rewarded.addAdEventListener(AdEventType.ERROR, (e) => {
+        console.warn('showRewardedAd: 광고 표시 중 에러', e);
+        settle(false);
+      });
+
+      try {
+        rewarded.show();
+      } catch (e) {
+        console.warn('showRewardedAd: show() 실패', e);
+        settle(false);
+      }
     });
   } catch (e) {
-    // 광고 로드 실패 — 공유는 계속 진행
     console.warn('showRewardedAd: 광고 로드 실패, 공유를 계속 진행합니다.', e);
     return false;
   }

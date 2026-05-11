@@ -33,8 +33,8 @@ interface UserState {
   deleteAccount: () => Promise<void>;
   setNickname: (nickname: string) => Promise<void>;
   setAge: (age: number) => Promise<void>;
-  setPushSettings: (enabled: boolean, time: string) => Promise<void>;
-  updateProfile: (params: { nickname?: string; age?: number; imageUri?: string }) => Promise<void>;
+  setPushSettings: (enabled: boolean, time: string, slots?: { morning: boolean; lunch: boolean; evening: boolean }) => Promise<void>;
+  updateProfile: (params: { nickname?: string; age?: number; gender?: 'male' | 'female' | null; imageUri?: string }) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   clearUser: () => Promise<void>;
 }
@@ -228,10 +228,15 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
-  setPushSettings: async (push_enabled, push_time) => {
+  setPushSettings: async (push_enabled, push_time, push_slots?) => {
     const currentUser = get().user;
     if (!currentUser) return;
-    const updated = { ...currentUser, push_enabled, push_time };
+    const updated = {
+      ...currentUser,
+      push_enabled,
+      push_time,
+      ...(push_slots !== undefined && { push_slots }),
+    };
     set({ user: updated });
     try {
       await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
@@ -240,7 +245,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
-  updateProfile: async ({ nickname, age, imageUri }) => {
+  updateProfile: async ({ nickname, age, gender, imageUri }) => {
     const currentUser = get().user;
     if (!currentUser) return;
 
@@ -261,6 +266,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       ...currentUser,
       ...(nickname !== undefined && { nickname }),
       ...(age !== undefined && { age }),
+      ...(gender !== undefined && { gender }),
       ...(profileImage !== undefined && { profileImage }),
     };
 
@@ -271,6 +277,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         await updateDoc(doc(db, 'users', currentUser.user_id), {
           ...(nickname !== undefined && { nickname }),
           ...(age !== undefined && { age }),
+          ...(gender !== undefined && { gender }),
           ...(profileImage !== undefined && { profileImage }),
         });
       }
