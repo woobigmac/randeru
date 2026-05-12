@@ -1,4 +1,5 @@
 import analytics from '@react-native-firebase/analytics';
+import { Action } from '../types';
 
 /**
  * 모든 analytics 호출을 try-catch로 감싸 앱 크래시를 방지합니다.
@@ -62,11 +63,26 @@ export const logActionShared = (actionId: string, shareChannel: string): void =>
 };
 
 /** 재추첨 시 */
-export const logReshuffle = (reshuffleCount: number, usedAd: boolean): void => {
+export const logReshuffle = (
+  reshuffleCount: number,
+  usedAd: boolean,
+  dismissedAction?: Action,
+): void => {
+  const actionParams = dismissedAction
+    ? {
+        action_id: dismissedAction.action_id,
+        category: dismissedAction.category,
+        difficulty: dismissedAction.difficulty,
+        place_tag: dismissedAction.place_tag,
+        media_type: dismissedAction.media_type ?? 'unknown',
+      }
+    : {};
+
   void safe(() =>
     analytics().logEvent('reshuffle', {
       reshuffle_count: reshuffleCount,
       used_ad: usedAd,
+      ...actionParams,
     }),
   );
 };

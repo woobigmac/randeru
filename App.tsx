@@ -7,7 +7,14 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import mobileAds from 'react-native-google-mobile-ads';
 import RootNavigator from './src/navigation/RootNavigator';
-import { runSeedActions, runSeedSense, runSeedKind, runSeedConnect, runSeedEnvironment } from './src/services/seedActions';
+import {
+  runSeedActions,
+  runSeedSense,
+  runSeedKind,
+  runSeedConnect,
+  runSeedEnvironment,
+  runSeedAdditionalActions,
+} from './src/services/seedActions';
 
 // 네이티브 스플래시를 자동 숨김 방지 — 폰트 로드 완료 후 직접 숨긴다
 SplashScreen.preventAutoHideAsync();
@@ -25,11 +32,14 @@ export default function App() {
 
   useEffect(() => {
     if (__DEV__) {
-      runSeedActions();
-      runSeedSense();
-      runSeedKind();
-      runSeedConnect();
-      runSeedEnvironment();
+      void (async () => {
+        await runSeedActions();
+        await runSeedSense();
+        await runSeedKind();
+        await runSeedConnect();
+        await runSeedEnvironment();
+        await runSeedAdditionalActions();
+      })();
     }
   }, []);
 

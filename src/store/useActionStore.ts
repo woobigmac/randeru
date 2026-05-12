@@ -9,6 +9,8 @@ import {
   reshuffleAction as reshuffleActionService,
 } from '../services/actionService';
 import { showRewardedAd } from '../services/adService';
+import { logActionAccepted, logActionReceived, logReshuffle } from '../services/analyticsService';
+import { trackActionActivity } from '../services/actionActivityService';
 import { DAILY_SLOTS, MAX_RESHUFFLE_COUNT, FREE_RESHUFFLE_COUNT } from '../constants';
 
 function getCurrentSlotId(): SlotId {
@@ -105,6 +107,10 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
         return;
       }
       const record = await acceptSlotAction(userId, action, slotId);
+      logActionReceived(action.action_id, action.category);
+      logActionAccepted(action.action_id, action.category);
+      trackActionActivity(userId, action, 'received', { record_id: record.record_id, slot_id: slotId });
+      trackActionActivity(userId, action, 'accepted', { record_id: record.record_id, slot_id: slotId });
 
       const updatedSlots = todaySlots.map((s) =>
         s.slot_id === slotId
@@ -167,7 +173,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
     });
   },
 
-  reshuffleAction: async (_userId) => {
+  reshuffleAction: async (userId) => {
     if (get().isLoading) return;
 
     const { todaySlots, activeSlotId } = get();
@@ -188,6 +194,24 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
         return;
       }
       await reshuffleActionService(activeSlot.record.record_id, newAction, reshuffleCount);
+      logReshuffle(reshuffleCount + 1, false, activeSlot.action);
+      trackActionActivity(userId, activeSlot.action, 'reshuffled', {
+        record_id: activeSlot.record.record_id,
+        slot_id: activeSlotId,
+        reshuffle_count: reshuffleCount + 1,
+        used_ad: false,
+        next_action_id: newAction.action_id,
+      });
+      logActionReceived(newAction.action_id, newAction.category);
+      logActionAccepted(newAction.action_id, newAction.category);
+      trackActionActivity(userId, newAction, 'received', {
+        record_id: activeSlot.record.record_id,
+        slot_id: activeSlotId,
+      });
+      trackActionActivity(userId, newAction, 'accepted', {
+        record_id: activeSlot.record.record_id,
+        slot_id: activeSlotId,
+      });
       const updatedRecord = { ...activeSlot.record, action_id: newAction.action_id, reshuffle_count: reshuffleCount + 1 };
       const updatedSlots = todaySlots.map((s) =>
         s.slot_id === activeSlotId
@@ -203,7 +227,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
     }
   },
 
-  reshuffleWithAd: async (_userId) => {
+  reshuffleWithAd: async (userId) => {
     if (get().isLoading || get().isAdLoading) return;
 
     const { todaySlots, activeSlotId } = get();
@@ -230,6 +254,24 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
         return;
       }
       await reshuffleActionService(activeSlot.record.record_id, newAction, reshuffleCount);
+      logReshuffle(reshuffleCount + 1, true, activeSlot.action);
+      trackActionActivity(userId, activeSlot.action, 'reshuffled', {
+        record_id: activeSlot.record.record_id,
+        slot_id: activeSlotId,
+        reshuffle_count: reshuffleCount + 1,
+        used_ad: true,
+        next_action_id: newAction.action_id,
+      });
+      logActionReceived(newAction.action_id, newAction.category);
+      logActionAccepted(newAction.action_id, newAction.category);
+      trackActionActivity(userId, newAction, 'received', {
+        record_id: activeSlot.record.record_id,
+        slot_id: activeSlotId,
+      });
+      trackActionActivity(userId, newAction, 'accepted', {
+        record_id: activeSlot.record.record_id,
+        slot_id: activeSlotId,
+      });
       const updatedRecord = { ...activeSlot.record, action_id: newAction.action_id, reshuffle_count: reshuffleCount + 1 };
       const updatedSlots = todaySlots.map((s) =>
         s.slot_id === activeSlotId

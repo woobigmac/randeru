@@ -25,6 +25,7 @@ import { Header } from '../../components/Header';
 import { Button } from '../../components/Button';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 import { logActionCompleted } from '../../services/analyticsService';
+import { trackActionActivity } from '../../services/actionActivityService';
 import { DailyRecord } from '../../types';
 
 type Props = {
@@ -292,6 +293,12 @@ export default function PhotoScreen({ navigation, route }: Props) {
       await updateRecord(recordId, completedRecord);
       setActionCompleted(completedRecord);
       logActionCompleted(action.action_id, action.category, !!mediaUri);
+      trackActionActivity(user?.user_id, action, 'completed', {
+        record_id: recordId,
+        has_media: !!mediaUri,
+        captured_media_type: activeTab,
+        memo_written: !!memo.trim(),
+      });
       navigation.navigate('Complete', { recordId });
     } catch (e) {
       console.error('handleSave error:', e);
