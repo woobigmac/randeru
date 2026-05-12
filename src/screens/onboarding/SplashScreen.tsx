@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserStore } from '../../store/useUserStore';
 import {
+  hasNotificationPermission,
   registerPushToken,
   scheduleDailySlotNotifications,
 } from '../../services/notificationService';
@@ -25,7 +26,11 @@ export default function SplashScreen() {
 
         // push 알림 활성화 상태면 슬롯별 알림 재등록
         if (user.push_enabled) {
-          scheduleDailySlotNotifications(user.push_slots).catch(() => {});
+          hasNotificationPermission()
+            .then((granted) => {
+              if (granted) scheduleDailySlotNotifications(user.push_slots).catch(() => {});
+            })
+            .catch(() => {});
         }
       }
     };

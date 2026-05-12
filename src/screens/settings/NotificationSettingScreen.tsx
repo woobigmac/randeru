@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
   Switch,
   ActivityIndicator,
+  Alert,
   StyleSheet,
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useUserStore } from '../../store/useUserStore';
 import {
+  hasNotificationPermission,
   requestPermission,
   scheduleDailySlotNotifications,
   cancelAllNotifications,
@@ -30,14 +33,55 @@ export default function NotificationSettingScreen() {
   );
   const [isLoading, setIsLoading] = useState(false);
 
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const syncActualNotificationState = async () => {
+        if (!user) return;
+
+        const currentSlots = user.push_slots ?? DEFAULT_SLOTS;
+        const enabledInApp = user.push_enabled ?? false;
+        const hasPermission = await hasNotificationPermission();
+
+        if (!isActive) return;
+
+        setSlots(currentSlots);
+
+        if (!enabledInApp) {
+          setMasterEnabled(false);
+          return;
+        }
+
+        if (!hasPermission) {
+          await cancelAllNotifications();
+          await setPushSettings(false, user.push_time ?? '09:00', currentSlots);
+          if (isActive) setMasterEnabled(false);
+          return;
+        }
+
+        await scheduleDailySlotNotifications(currentSlots);
+        if (isActive) setMasterEnabled(true);
+      };
+
+      syncActualNotificationState().catch((e) => {
+        console.error('notification sync error:', e);
+      });
+
+      return () => { isActive = false; };
+    }, [setPushSettings, user]),
+  );
+
   const handleMasterToggle = async (value: boolean) => {
     setIsLoading(true);
     try {
       if (value) {
         const granted = await requestPermission();
         if (!granted) return;
-        await scheduleDailySlotNotifications(slots);
-        await setPushSettings(true, user?.push_time ?? '09:00', slots);
+        const activeSlots = Object.values(slots).some(Boolean) ? slots : DEFAULT_SLOTS;
+        setSlots(activeSlots);
+        await scheduleDailySlotNotifications(activeSlots);
+        await setPushSettings(true, user?.push_time ?? '09:00', activeSlots);
         setMasterEnabled(true);
       } else {
         await cancelAllNotifications();
@@ -53,6 +97,11 @@ export default function NotificationSettingScreen() {
 
   const handleSlotToggle = async (key: SlotKey, value: boolean) => {
     const updated = { ...slots, [key]: value };
+    if (!Object.values(updated).some(Boolean)) {
+      Alert.alert('알림 시간 필요', '최소 한 개의 알림 시간은 켜두어야 해요.');
+      return;
+    }
+
     setSlots(updated);
     if (masterEnabled) {
       try {

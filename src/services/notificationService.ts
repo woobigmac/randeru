@@ -5,6 +5,8 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { PUSH_MESSAGES } from '../constants';
 
+type SlotSettings = { morning: boolean; lunch: boolean; evening: boolean };
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -42,6 +44,16 @@ export async function requestPermission(): Promise<boolean> {
     return false;
   } catch (e) {
     console.warn('requestPermission error:', e);
+    return false;
+  }
+}
+
+export async function hasNotificationPermission(): Promise<boolean> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status === 'granted';
+  } catch (e) {
+    console.warn('hasNotificationPermission error:', e);
     return false;
   }
 }
@@ -89,8 +101,8 @@ export async function scheduleDailyNotification(time: string): Promise<void> {
  * enabledSlots: 활성화할 슬롯 설정. undefined면 전체 활성화.
  */
 export async function scheduleDailySlotNotifications(
-  enabledSlots?: { morning: boolean; lunch: boolean; evening: boolean },
-): Promise<void> {
+  enabledSlots?: SlotSettings,
+): Promise<number> {
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
 
@@ -118,6 +130,7 @@ export async function scheduleDailySlotNotifications(
       },
     ];
 
+    let scheduledCount = 0;
     for (const slot of slots) {
       if (!slot.enabled) continue;
       await Notifications.scheduleNotificationAsync({
@@ -128,9 +141,12 @@ export async function scheduleDailySlotNotifications(
           minute: slot.minute,
         },
       });
+      scheduledCount += 1;
     }
+    return scheduledCount;
   } catch (e) {
     console.warn('scheduleDailySlotNotifications error:', e);
+    return 0;
   }
 }
 
