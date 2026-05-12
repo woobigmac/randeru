@@ -37,11 +37,27 @@ const APP_ICON = require('../../../assets/icon.png');
 const INSTAGRAM_URL = 'instagram://app';
 const INSTAGRAM_STORIES_URL = 'instagram-stories://share';
 
+type DateLike = Date | string | { toDate: () => Date } | undefined;
+
+function toSafeDate(date: DateLike): Date | null {
+  if (!date) return null;
+  if (date instanceof Date) return isNaN(date.getTime()) ? null : date;
+  if (typeof date === 'string') {
+    const parsed = new Date(date);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+  try {
+    const parsed = date.toDate();
+    return isNaN(parsed.getTime()) ? null : parsed;
+  } catch {
+    return null;
+  }
+}
+
 // ─── 아날로그 카메라 타임스탬프 포맷 ────────────────────────────────────────
-function formatTimestamp(date: Date | string | undefined): string {
-  if (!date) return '';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  if (isNaN(d.getTime())) return '';
+function formatTimestamp(date: DateLike): string {
+  const d = toSafeDate(date);
+  if (!d) return '';
   const yy = String(d.getFullYear()).slice(2);
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
@@ -57,7 +73,7 @@ type ShareCardProps = {
   memo?: string;
   mediaUrl?: string;
   mediaType?: 'photo' | 'video';
-  completedAt?: Date | string;
+  completedAt?: DateLike;
   onImageLoaded?: () => void;
 };
 
@@ -246,7 +262,7 @@ export default function ShareScreen({ navigation, route }: Props) {
   const mediaUrl = record.media_url ?? record.photo_url;
   // 영상인 경우 카드 미리보기에는 썸네일 이미지를 사용
   const cardPreviewUrl = record.media_type === 'video'
-    ? (record.thumbnail_url !== record.media_url ? record.thumbnail_url : undefined)
+    ? (record.thumbnail_url && record.thumbnail_url !== record.media_url ? record.thumbnail_url : undefined)
     : mediaUrl;
 
   /** 이미지 로드 완료 혹은 이미지 없음 시 호출 */
