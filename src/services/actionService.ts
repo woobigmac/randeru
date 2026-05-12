@@ -8,6 +8,7 @@ import {
   query,
   where,
   Timestamp,
+  increment,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Action, DailyRecord, DailySlotStatus, SlotId, Tone } from '../types';
@@ -197,6 +198,8 @@ export async function acceptSlotAction(
     status: 'accepted' as const,
     photo_uploaded: false,
     reshuffle_count: 0,
+    free_reshuffle_used: false,
+    ad_reshuffle_count: 0,
     accepted_at: Timestamp.fromDate(now),
   };
 
@@ -218,12 +221,16 @@ export async function reshuffleAction(
   recordId: string,
   newAction: Action,
   reshuffleCount: number,
+  usedAd: boolean,
 ): Promise<void> {
   try {
     await firestoreTimeout(
       updateDoc(doc(db, 'records', recordId), {
         action_id: newAction.action_id,
         reshuffle_count: reshuffleCount + 1,
+        ...(usedAd
+          ? { ad_reshuffle_count: increment(1) }
+          : { free_reshuffle_used: true }),
       }),
     );
   } catch (e) {

@@ -44,6 +44,8 @@ export interface DailyRecord {
   photo_uploaded: boolean;
   memo?: string;
   reshuffle_count: number;
+  free_reshuffle_used?: boolean;
+  ad_reshuffle_count?: number;
   accepted_at?: Date;
   completed_at?: Date;
   shared_at?: Date;

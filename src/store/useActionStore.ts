@@ -11,7 +11,7 @@ import {
 import { showRewardedAd } from '../services/adService';
 import { logActionAccepted, logActionReceived, logReshuffle } from '../services/analyticsService';
 import { trackActionActivity } from '../services/actionActivityService';
-import { DAILY_SLOTS, MAX_RESHUFFLE_COUNT, FREE_RESHUFFLE_COUNT } from '../constants';
+import { DAILY_FREE_RESHUFFLE_COUNT, DAILY_SLOTS, MAX_RESHUFFLE_COUNT } from '../constants';
 
 function getCurrentSlotId(): SlotId {
   const now = new Date();
@@ -45,7 +45,6 @@ interface ActionStoreState {
   setActionCompleted: (recordUpdates?: Partial<DailyRecord>) => void;
   setActionShared: () => void;
 
-  reshuffleAction: (userId: string) => Promise<void>;
   reshuffleWithAd: (userId: string) => Promise<void>;
 }
 
@@ -61,6 +60,13 @@ function deriveFromSlot(slots: DailySlotStatus[], slotId: SlotId | null) {
       'not_received'
     ) as ActionStatus,
   };
+}
+
+function hasUsedDailyFreeReshuffle(slots: DailySlotStatus[]): boolean {
+  return (
+    slots.filter((slot) => slot.record?.free_reshuffle_used === true).length >=
+    DAILY_FREE_RESHUFFLE_COUNT
+  );
 }
 
 export const useActionStore = create<ActionStoreState>((set, get) => ({
@@ -173,60 +179,6 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
     });
   },
 
-  reshuffleAction: async (userId) => {
-    if (get().isLoading) return;
-
-    const { todaySlots, activeSlotId } = get();
-    if (!activeSlotId) return;
-    const activeSlot = todaySlots.find((s) => s.slot_id === activeSlotId);
-    if (!activeSlot?.record || !activeSlot?.action) return;
-
-    const reshuffleCount = activeSlot.record.reshuffle_count ?? 0;
-    if (reshuffleCount >= MAX_RESHUFFLE_COUNT) return;
-    if (reshuffleCount >= FREE_RESHUFFLE_COUNT) return; // 유료 구간은 reshuffleWithAd 사용
-
-    set({ isLoading: true, error: null });
-    try {
-      const usedIds = todaySlots.filter((s) => s.action).map((s) => s.action!.action_id);
-      const newAction = await getRandomAction(usedIds, []);
-      if (!newAction) {
-        set({ error: '다른 액션을 찾지 못했어요' });
-        return;
-      }
-      await reshuffleActionService(activeSlot.record.record_id, newAction, reshuffleCount);
-      logReshuffle(reshuffleCount + 1, false, activeSlot.action);
-      trackActionActivity(userId, activeSlot.action, 'reshuffled', {
-        record_id: activeSlot.record.record_id,
-        slot_id: activeSlotId,
-        reshuffle_count: reshuffleCount + 1,
-        used_ad: false,
-        next_action_id: newAction.action_id,
-      });
-      logActionReceived(newAction.action_id, newAction.category);
-      logActionAccepted(newAction.action_id, newAction.category);
-      trackActionActivity(userId, newAction, 'received', {
-        record_id: activeSlot.record.record_id,
-        slot_id: activeSlotId,
-      });
-      trackActionActivity(userId, newAction, 'accepted', {
-        record_id: activeSlot.record.record_id,
-        slot_id: activeSlotId,
-      });
-      const updatedRecord = { ...activeSlot.record, action_id: newAction.action_id, reshuffle_count: reshuffleCount + 1 };
-      const updatedSlots = todaySlots.map((s) =>
-        s.slot_id === activeSlotId
-          ? { ...s, action: newAction, record: updatedRecord }
-          : s,
-      );
-      set({ todaySlots: updatedSlots, todayAction: newAction, todayRecord: updatedRecord });
-    } catch (e) {
-      console.error('reshuffleAction error:', e);
-      set({ error: isFirestoreTimeoutError(e) ? TIMEOUT_MSG : '재추첨에 실패했어요' });
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
   reshuffleWithAd: async (userId) => {
     if (get().isLoading || get().isAdLoading) return;
 
@@ -237,13 +189,16 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
 
     const reshuffleCount = activeSlot.record.reshuffle_count ?? 0;
     if (reshuffleCount >= MAX_RESHUFFLE_COUNT) return;
+    const useFreeReshuffle = !hasUsedDailyFreeReshuffle(todaySlots);
 
-    set({ isAdLoading: true, error: null });
+    set({ isAdLoading: !useFreeReshuffle, isLoading: useFreeReshuffle, error: null });
     try {
-      const rewarded = await showRewardedAd();
-      if (!rewarded) {
-        Alert.alert('재추첨 불가', '광고를 끝까지 시청하거나\n네트워크 연결을 확인해 주세요.');
-        return;
+      if (!useFreeReshuffle) {
+        const rewarded = await showRewardedAd();
+        if (!rewarded) {
+          Alert.alert('재추첨 불가', '광고를 끝까지 시청하거나\n네트워크 연결을 확인해 주세요.');
+          return;
+        }
       }
 
       set({ isAdLoading: false, isLoading: true });
@@ -253,13 +208,18 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
         set({ error: '다른 액션을 찾지 못했어요' });
         return;
       }
-      await reshuffleActionService(activeSlot.record.record_id, newAction, reshuffleCount);
-      logReshuffle(reshuffleCount + 1, true, activeSlot.action);
+      await reshuffleActionService(
+        activeSlot.record.record_id,
+        newAction,
+        reshuffleCount,
+        !useFreeReshuffle,
+      );
+      logReshuffle(reshuffleCount + 1, !useFreeReshuffle, activeSlot.action);
       trackActionActivity(userId, activeSlot.action, 'reshuffled', {
         record_id: activeSlot.record.record_id,
         slot_id: activeSlotId,
         reshuffle_count: reshuffleCount + 1,
-        used_ad: true,
+        used_ad: !useFreeReshuffle,
         next_action_id: newAction.action_id,
       });
       logActionReceived(newAction.action_id, newAction.category);
@@ -272,7 +232,14 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
         record_id: activeSlot.record.record_id,
         slot_id: activeSlotId,
       });
-      const updatedRecord = { ...activeSlot.record, action_id: newAction.action_id, reshuffle_count: reshuffleCount + 1 };
+      const updatedRecord = {
+        ...activeSlot.record,
+        action_id: newAction.action_id,
+        reshuffle_count: reshuffleCount + 1,
+        ...(useFreeReshuffle
+          ? { free_reshuffle_used: true }
+          : { ad_reshuffle_count: (activeSlot.record.ad_reshuffle_count ?? 0) + 1 }),
+      };
       const updatedSlots = todaySlots.map((s) =>
         s.slot_id === activeSlotId
           ? { ...s, action: newAction, record: updatedRecord }

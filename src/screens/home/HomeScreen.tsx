@@ -55,6 +55,9 @@ export default function HomeScreen({ navigation }: Props) {
   const completedCount = todaySlots.filter(
     (s) => s.status === 'completed',
   ).length;
+  const hasDailyFreeReshuffle = !todaySlots.some(
+    (s) => s.record?.free_reshuffle_used === true,
+  );
 
   if (isLoading) {
     return (
@@ -129,6 +132,7 @@ export default function HomeScreen({ navigation }: Props) {
           slot={activeSlot}
           slotId={activeSlotId}
           isAdLoading={isAdLoading}
+          hasDailyFreeReshuffle={hasDailyFreeReshuffle}
           onReceive={() => {
             if (user?.user_id && activeSlotId) {
               receiveSlotAction(user.user_id, activeSlotId);
@@ -179,6 +183,7 @@ type SlotContentProps = {
   slot: DailySlotStatus | null;
   slotId: SlotId | null;
   isAdLoading: boolean;
+  hasDailyFreeReshuffle: boolean;
   onReceive: () => void;
   onReshuffle: () => void;
   onDetail: () => void;
@@ -187,7 +192,18 @@ type SlotContentProps = {
   onRecords: () => void;
 };
 
-function SlotContent({ slot, slotId, isAdLoading, onReceive, onReshuffle, onDetail, onComplete, onShare, onRecords }: SlotContentProps) {
+function SlotContent({
+  slot,
+  slotId,
+  isAdLoading,
+  hasDailyFreeReshuffle,
+  onReceive,
+  onReshuffle,
+  onDetail,
+  onComplete,
+  onShare,
+  onRecords,
+}: SlotContentProps) {
   if (!slot || !slotId) {
     return (
       <View style={styles.centered}>
@@ -253,7 +269,13 @@ function SlotContent({ slot, slotId, isAdLoading, onReceive, onReshuffle, onDeta
         />
         {canReshuffle && (
           <Button
-            label={isAdLoading ? '광고 로딩 중...' : `다시뽑기 (${reshuffleLeft}회 남음)`}
+            label={
+              isAdLoading
+                ? '광고 로딩 중...'
+                : hasDailyFreeReshuffle
+                  ? `무료 다시뽑기 (${reshuffleLeft}회 남음)`
+                  : `광고 보고 다시뽑기 (${reshuffleLeft}회 남음)`
+            }
             onPress={onReshuffle}
             variant="text"
             style={{ marginTop: Spacing.sm }}

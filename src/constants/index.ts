@@ -2,8 +2,7 @@ import { Platform } from 'react-native';
 import { SlotId } from '../types';
 
 export const MAX_RESHUFFLE_COUNT = 3;
-export const FREE_RESHUFFLE_COUNT = 1;
-export const AD_RESHUFFLE_COUNT = 2;
+export const DAILY_FREE_RESHUFFLE_COUNT = 1;
 
 export const MIN_AGE = 10;
 export const MAX_AGE = 100;
