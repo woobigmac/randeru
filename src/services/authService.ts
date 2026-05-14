@@ -1,8 +1,5 @@
 import { login, logout, unlink, me, KakaoUser } from '@react-native-kakao/user';
-import appleAuth, {
-  AppleRequestOperation,
-  AppleRequestScope,
-} from '@invertase/react-native-apple-authentication';
+import appleAuth from '@invertase/react-native-apple-authentication';
 
 // ─── 카카오 ──────────────────────────────────────────────────────────────────
 
@@ -44,8 +41,8 @@ export async function loginWithApple(): Promise<AppleLoginResult> {
   }
 
   const response = await appleAuth.performRequest({
-    requestedOperation: AppleRequestOperation.LOGIN,
-    requestedScopes: [AppleRequestScope.EMAIL, AppleRequestScope.FULL_NAME],
+    requestedOperation: appleAuth.Operation.LOGIN,
+    requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
   });
 
   if (!response.identityToken) {
