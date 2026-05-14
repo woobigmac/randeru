@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,22 +14,41 @@ import { useUserStore } from '../../store/useUserStore';
 import { logLogin } from '../../services/analyticsService';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 
+const isAppleAuthCanceled = (e: unknown): boolean => {
+  if (!(e instanceof Error) && (typeof e !== 'object' || e === null)) return false;
+
+  const error = e as { code?: unknown; nativeErrorCode?: unknown; message?: unknown };
+  const code = typeof error.code === 'string' ? error.code : undefined;
+  const nativeErrorCode =
+    typeof error.nativeErrorCode === 'string' ? error.nativeErrorCode : undefined;
+  const message = typeof error.message === 'string' ? error.message : '';
+
+  return code === '1001' || nativeErrorCode === '1001' || message.includes('error 1001');
+};
+
 export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isAppleLoginInProgress, setIsAppleLoginInProgress] = useState(false);
+  const appleLoginInFlightRef = useRef(false);
   const loginWithKakao = useUserStore((s) => s.loginWithKakao);
   const loginWithApple = useUserStore((s) => s.loginWithApple);
   const loginAsGuest = useUserStore((s) => s.loginAsGuest);
 
   const handleAppleLogin = async () => {
-    setIsLoading(true);
+    if (appleLoginInFlightRef.current || isLoading) return;
+    appleLoginInFlightRef.current = true;
+    setIsAppleLoginInProgress(true);
     try {
       await loginWithApple();
       logLogin('apple');
     } catch (e: unknown) {
+      if (isAppleAuthCanceled(e)) return;
+
       const message = e instanceof Error ? e.message : 'Apple 로그인에 실패했어요.';
       Alert.alert('로그인 실패', message);
     } finally {
-      setIsLoading(false);
+      appleLoginInFlightRef.current = false;
+      setIsAppleLoginInProgress(false);
     }
   };
 
@@ -82,8 +101,12 @@ export default function LoginScreen() {
               {/* Apple 로그인 — iOS에서만 표시, 애플 정책상 최상단 */}
               {Platform.OS === 'ios' && (
                 <TouchableOpacity
-                  style={styles.appleButton}
+                  style={[
+                    styles.appleButton,
+                    isAppleLoginInProgress && styles.disabledButton,
+                  ]}
                   onPress={handleAppleLogin}
+                  disabled={isAppleLoginInProgress}
                   activeOpacity={0.85}
                 >
                   <Text style={styles.appleLogo}></Text>
@@ -94,6 +117,7 @@ export default function LoginScreen() {
               <TouchableOpacity
                 style={styles.kakaoButton}
                 onPress={handleKakaoLogin}
+                disabled={isAppleLoginInProgress}
                 activeOpacity={0.85}
               >
                 <Text style={styles.kakaoLogo}>K</Text>
@@ -103,6 +127,7 @@ export default function LoginScreen() {
               <TouchableOpacity
                 style={styles.guestButton}
                 onPress={handleGuestLogin}
+                disabled={isAppleLoginInProgress}
                 activeOpacity={0.7}
               >
                 <Text style={styles.guestText}>게스트로 시작하기</Text>
@@ -202,6 +227,9 @@ const styles = StyleSheet.create({
   guestButton: {
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.lg,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   guestText: {
     fontSize: 14,
