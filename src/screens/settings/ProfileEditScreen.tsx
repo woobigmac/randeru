@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,8 @@ import {
   Image,
   Alert,
   ActivityIndicator,
-  FlatList,
   ScrollView,
   StyleSheet,
-  ListRenderItemInfo,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +17,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useUserStore } from '../../store/useUserStore';
 import { MyPageStackParamList } from '../../navigation/MyPageStackNavigator';
 import { logProfileUpdated } from '../../services/analyticsService';
-import { MIN_AGE, MAX_AGE } from '../../constants';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 
 type Gender = 'male' | 'female' | null;
@@ -30,10 +25,6 @@ type Props = {
   navigation: StackNavigationProp<MyPageStackParamList, 'ProfileEdit'>;
 };
 
-const ITEM_HEIGHT = 56;
-const VISIBLE_ITEMS = 5;
-const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
-const AGES = Array.from({ length: MAX_AGE - MIN_AGE + 1 }, (_, i) => MIN_AGE + i);
 const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9]{2,10}$/;
 
 export default function ProfileEditScreen({ navigation }: Props) {
@@ -41,24 +32,9 @@ export default function ProfileEditScreen({ navigation }: Props) {
   const { user, updateProfile } = useUserStore();
 
   const [nickname, setNickname] = useState(user?.nickname ?? '');
-  const [selectedAge, setSelectedAge] = useState(user?.age ?? 20);
   const [selectedGender, setSelectedGender] = useState<Gender>(user?.gender ?? null);
   const [imageUri, setImageUri] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
-
-  const flatListRef = useRef<FlatList>(null);
-
-  useEffect(() => {
-    const currentAge = user?.age ?? 20;
-    const index = AGES.indexOf(currentAge);
-    if (index < 0) return;
-    setTimeout(() => {
-      flatListRef.current?.scrollToOffset({
-        offset: index * ITEM_HEIGHT,
-        animated: false,
-      });
-    }, 100);
-  }, []);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -77,16 +53,6 @@ export default function ProfileEditScreen({ navigation }: Props) {
     }
   };
 
-  const handleScrollEnd = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const offsetY = e.nativeEvent.contentOffset.y;
-      const index = Math.round(offsetY / ITEM_HEIGHT);
-      const clamped = Math.max(0, Math.min(index, AGES.length - 1));
-      setSelectedAge(AGES[clamped]);
-    },
-    [],
-  );
-
   const handleSave = async () => {
     const trimmed = nickname.trim();
     if (!NICKNAME_REGEX.test(trimmed)) {
@@ -97,13 +63,11 @@ export default function ProfileEditScreen({ navigation }: Props) {
     try {
       const updatedFields: string[] = [];
       if (trimmed !== user?.nickname) updatedFields.push('nickname');
-      if (selectedAge !== user?.age) updatedFields.push('age');
       if (selectedGender !== user?.gender) updatedFields.push('gender');
       if (imageUri) updatedFields.push('profileImage');
 
       await updateProfile({
         nickname: trimmed,
-        age: selectedAge,
         gender: selectedGender,
         imageUri,
       });
@@ -119,26 +83,6 @@ export default function ProfileEditScreen({ navigation }: Props) {
       setIsSaving(false);
     }
   };
-
-  const renderAgeItem = useCallback(
-    ({ item }: ListRenderItemInfo<number>) => {
-      const diff = Math.abs(item - selectedAge);
-      const isCenter = diff === 0;
-      const isAdjacent = diff === 1;
-      const fontSize = isCenter ? 28 : isAdjacent ? 20 : 16;
-      const opacity = isCenter ? 1 : isAdjacent ? 0.5 : 0.2;
-      const color = isCenter ? Colors.primary : isAdjacent ? Colors.textSecondary : Colors.textTertiary;
-      const fontWeight = isCenter ? '600' : '400';
-      return (
-        <View style={ageStyles.item}>
-          <Text style={{ fontSize, opacity, color, fontWeight }}>
-            {item}세
-          </Text>
-        </View>
-      );
-    },
-    [selectedAge],
-  );
 
   const profileImageSource = imageUri
     ? { uri: imageUri }
@@ -224,32 +168,6 @@ export default function ProfileEditScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* 나이 피커 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>나이</Text>
-          <View style={ageStyles.pickerWrapper}>
-            <View style={ageStyles.selectionTop} pointerEvents="none" />
-            <View style={ageStyles.selectionBottom} pointerEvents="none" />
-            <FlatList
-              ref={flatListRef}
-              data={AGES}
-              keyExtractor={(item) => String(item)}
-              renderItem={renderAgeItem}
-              getItemLayout={(_, index) => ({
-                length: ITEM_HEIGHT,
-                offset: ITEM_HEIGHT * index,
-                index,
-              })}
-              showsVerticalScrollIndicator={false}
-              snapToInterval={ITEM_HEIGHT}
-              decelerationRate="fast"
-              onMomentumScrollEnd={handleScrollEnd}
-              onScrollEndDrag={handleScrollEnd}
-              contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
-              style={ageStyles.flatList}
-            />
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -343,39 +261,4 @@ const styles = StyleSheet.create({
   },
   genderLabel: { fontSize: 15, fontWeight: '500', color: Colors.textSecondary },
   genderLabelSelected: { color: Colors.white, fontWeight: '600' },
-});
-
-const ageStyles = StyleSheet.create({
-  pickerWrapper: {
-    height: PICKER_HEIGHT,
-    overflow: 'hidden',
-    backgroundColor: Colors.white,
-    borderRadius: Radius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-  },
-  selectionTop: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: ITEM_HEIGHT * 2,
-    height: 1,
-    backgroundColor: Colors.primary,
-    zIndex: 1,
-  },
-  selectionBottom: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: ITEM_HEIGHT * 3,
-    height: 1,
-    backgroundColor: Colors.primary,
-    zIndex: 1,
-  },
-  flatList: { flex: 1 },
-  item: {
-    height: ITEM_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });

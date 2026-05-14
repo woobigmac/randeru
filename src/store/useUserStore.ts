@@ -32,9 +32,8 @@ interface UserState {
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   setNickname: (nickname: string) => Promise<void>;
-  setAge: (age: number) => Promise<void>;
   setPushSettings: (enabled: boolean, time: string, slots?: { morning: boolean; lunch: boolean; evening: boolean }) => Promise<void>;
-  updateProfile: (params: { nickname?: string; age?: number; gender?: 'male' | 'female' | null; imageUri?: string }) => Promise<void>;
+  updateProfile: (params: { nickname?: string; gender?: 'male' | 'female' | null; imageUri?: string }) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   clearUser: () => Promise<void>;
 }
@@ -97,7 +96,6 @@ export const useUserStore = create<UserState>((set, get) => ({
         push_enabled: false,
         push_time: DEFAULT_PUSH_TIME,
         created_at: new Date(),
-        age: 20,
       };
       await setDoc(docRef, user);
       isNewUser = true;
@@ -118,7 +116,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   loginWithApple: async () => {
-    const { appleId, email, fullName } = await appleLogin();
+    const { appleId, fullName } = await appleLogin();
     const docId = `apple_${appleId}`;
     const docRef = doc(db, 'users', docId);
     const docSnap = await getDoc(docRef);
@@ -132,15 +130,13 @@ export const useUserStore = create<UserState>((set, get) => ({
     } else {
       user = {
         user_id: docId,
-        nickname: fullName ?? email?.split('@')[0] ?? '랜데루 유저',
+        nickname: fullName ?? '랜데루 유저',
         loginType: 'apple',
         push_enabled: false,
         push_time: DEFAULT_PUSH_TIME,
         created_at: new Date(),
-        age: 20,
       };
-      // email/fullName은 Apple에서 최초 1회만 제공되므로 즉시 저장
-      await setDoc(docRef, { ...user, ...(email && { profileImage: undefined }) });
+      await setDoc(docRef, user);
       isNewUser = true;
     }
 
@@ -166,7 +162,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       push_enabled: false,
       push_time: DEFAULT_PUSH_TIME,
       created_at: new Date(),
-      age: 20,
     };
 
     await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
@@ -205,7 +200,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       push_enabled: true,
       push_time: DEFAULT_PUSH_TIME,
       created_at: new Date(),
-      age: 20,
     };
     const updated = { ...user, nickname };
     set({ user: updated });
@@ -213,18 +207,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
     } catch (e) {
       console.error('setNickname save error:', e);
-    }
-  },
-
-  setAge: async (age) => {
-    const currentUser = get().user;
-    if (!currentUser) return;
-    const updated = { ...currentUser, age };
-    set({ user: updated });
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
-    } catch (e) {
-      console.error('setAge save error:', e);
     }
   },
 
@@ -245,7 +227,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
-  updateProfile: async ({ nickname, age, gender, imageUri }) => {
+  updateProfile: async ({ nickname, gender, imageUri }) => {
     const currentUser = get().user;
     if (!currentUser) return;
 
@@ -265,7 +247,6 @@ export const useUserStore = create<UserState>((set, get) => ({
     const updated: User = {
       ...currentUser,
       ...(nickname !== undefined && { nickname }),
-      ...(age !== undefined && { age }),
       ...(gender !== undefined && { gender }),
       ...(profileImage !== undefined && { profileImage }),
     };
@@ -276,7 +257,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       if (currentUser.user_id) {
         await updateDoc(doc(db, 'users', currentUser.user_id), {
           ...(nickname !== undefined && { nickname }),
-          ...(age !== undefined && { age }),
           ...(gender !== undefined && { gender }),
           ...(profileImage !== undefined && { profileImage }),
         });

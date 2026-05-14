@@ -9,7 +9,7 @@ export interface User {
   push_time: string;
   push_slots?: { morning: boolean; lunch: boolean; evening: boolean };
   created_at: Date;
-  age: number;
+  age?: number;
   gender?: 'male' | 'female' | null;
   loginType: 'kakao' | 'apple' | 'guest';
   kakaoId?: string;

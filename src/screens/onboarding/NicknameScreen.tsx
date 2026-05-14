@@ -11,6 +11,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { useUserStore } from '../../store/useUserStore';
+import { registerPushToken } from '../../services/notificationService';
+import { logOnboardingComplete } from '../../services/analyticsService';
 import { Button } from '../../components/Button';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 
@@ -32,7 +34,7 @@ export default function NicknameScreen({ navigation }: Props) {
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState(false);
-  const setNicknameStore = useUserStore((state) => state.setNickname);
+  const { user, setNickname: setNicknameStore, completeOnboarding } = useUserStore();
 
   const handleChange = (value: string) => {
     setNickname(value);
@@ -43,7 +45,11 @@ export default function NicknameScreen({ navigation }: Props) {
     const err = validate(nickname);
     if (err) { setError(err); return; }
     await setNicknameStore(nickname.trim());
-    navigation.navigate('AgeSelect');
+    await completeOnboarding();
+    logOnboardingComplete();
+    if (user?.user_id) {
+      registerPushToken(user.user_id).catch(() => {});
+    }
   };
 
   const isValid = nickname.length >= 2 && validate(nickname) === '';

@@ -93,12 +93,8 @@ export const logLogin = (loginType: 'kakao' | 'apple' | 'guest'): void => {
 };
 
 /** 온보딩 완료 시 */
-export const logOnboardingComplete = (age: number): void => {
-  void safe(() =>
-    analytics().logEvent('onboarding_complete', {
-      age,
-    }),
-  );
+export const logOnboardingComplete = (): void => {
+  void safe(() => analytics().logEvent('onboarding_complete'));
 };
 
 /** 프로필 수정 완료 시 */

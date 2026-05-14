@@ -20,6 +20,10 @@
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
+        "NSCameraUsageDescription": "랜데루는 오늘의 액션을 완료한 사진이나 짧은 영상을 직접 촬영해 기록에 첨부하기 위해 카메라 접근이 필요합니다.",
+        "NSMicrophoneUsageDescription": "랜데루는 오늘의 액션을 짧은 영상으로 기록할 때 소리를 함께 저장하기 위해 마이크 접근이 필요합니다.",
+        "NSPhotoLibraryUsageDescription": "랜데루는 미션 완료 인증 사진이나 영상을 선택해 기록과 공유 카드에 첨부하기 위해 사진 보관함 접근이 필요합니다. 예: 오늘의 액션을 완료한 사진을 선택해 기록에 남깁니다.",
+        "NSPhotoLibraryAddUsageDescription": "랜데루는 미션 완료 공유 이미지를 사진 보관함에 저장하기 위해 권한이 필요합니다. 예: 완료 카드를 갤러리에 저장해 인스타그램에 공유합니다.",
         "LSApplicationQueriesSchemes": [
           "instagram",
           "instagram-stories"
