@@ -41,8 +41,9 @@ export async function loginWithApple(): Promise<AppleLoginResult> {
   }
 
   const response = await appleAuth.performRequest({
-    // iOS가 첫 가입/기존 로그인 흐름을 직접 고르게 둔다.
-    requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
+    requestedOperation: appleAuth.Operation.LOGIN,
+    requestedScopes: [],
+    nonceEnabled: false,
   });
 
   if (!response.identityToken) {
