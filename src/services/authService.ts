@@ -42,7 +42,7 @@ export async function loginWithApple(): Promise<AppleLoginResult> {
 
   const response = await appleAuth.performRequest({
     requestedOperation: appleAuth.Operation.LOGIN,
-    requestedScopes: [],
+    requestedScopes: [appleAuth.Scope.FULL_NAME, appleAuth.Scope.EMAIL],
     nonceEnabled: false,
   });
 
