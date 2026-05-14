@@ -16,7 +16,7 @@
       "icon": "./assets/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.randeru.app",
-      "buildNumber": "4",
+      "buildNumber": "33",
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
