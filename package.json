@@ -9,7 +9,6 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@invertase/react-native-apple-authentication": "^2.5.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-firebase/analytics": "^24.0.0",
     "@react-native-firebase/app": "^24.0.0",
@@ -22,6 +21,7 @@
     "@react-navigation/stack": "^7.8.10",
     "@types/react": "~19.1.10",
     "expo": "~54.0.34",
+    "expo-apple-authentication": "~8.0.8",
     "expo-av": "~16.0.8",
     "expo-build-properties": "~1.0.10",
     "expo-camera": "~17.0.10",
