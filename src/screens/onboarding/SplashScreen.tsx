@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image, StyleSheet, View } from 'react-native';
 import { useUserStore } from '../../store/useUserStore';
 import {
   hasNotificationPermission,
@@ -8,16 +7,16 @@ import {
   scheduleDailySlotNotifications,
 } from '../../services/notificationService';
 import { logAppOpen } from '../../services/analyticsService';
-import { Colors, Fonts } from '../../constants/theme';
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const splashImage = require('../../../assets/splash.png');
 
 export default function SplashScreen() {
   const loadUser = useUserStore((state) => state.loadUser);
 
   useEffect(() => {
     const init = async () => {
-      await Promise.all([loadUser(), delay(3500)]);
+      await Promise.all([loadUser(), delay(4000)]);
       logAppOpen();
 
       const { user, isOnboardingComplete } = useUserStore.getState();
@@ -40,10 +39,7 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.container}>
-      <SafeAreaView style={styles.inner}>
-        <Text style={styles.title}>랜데루</Text>
-        <Text style={styles.slogan}>하루에 하나, 인간다운 액션</Text>
-      </SafeAreaView>
+      <Image source={splashImage} style={styles.image} resizeMode="cover" />
     </View>
   );
 }
@@ -51,22 +47,9 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.primary,
   },
-  inner: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontFamily: Fonts.handwriting,
-    fontSize: 48,
-    color: Colors.white,
-    marginBottom: 16,
-  },
-  slogan: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-    letterSpacing: 0.5,
+  image: {
+    width: '100%',
+    height: '100%',
   },
 });

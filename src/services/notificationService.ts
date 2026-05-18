@@ -1,11 +1,21 @@
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Linking, Alert } from 'react-native';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { PUSH_MESSAGES } from '../constants';
 
 type SlotSettings = { morning: boolean; lunch: boolean; evening: boolean };
+
+const STORAGE_KEY_NOTIFICATION_INTRO_SEEN = 'randeru_notification_intro_seen';
+const STORAGE_KEY_INITIAL_NOTIFICATION_OPT_IN = 'randeru_initial_notification_opt_in';
+
+export const DEFAULT_NOTIFICATION_SLOTS: SlotSettings = {
+  morning: true,
+  lunch: true,
+  evening: true,
+};
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -25,22 +35,69 @@ if (Platform.OS === 'android') {
   });
 }
 
-export async function requestPermission(): Promise<boolean> {
+export async function hasSeenInitialNotificationPrompt(): Promise<boolean> {
   try {
+    return (await AsyncStorage.getItem(STORAGE_KEY_NOTIFICATION_INTRO_SEEN)) === 'true';
+  } catch (e) {
+    console.warn('hasSeenInitialNotificationPrompt error:', e);
+    return true;
+  }
+}
+
+export async function setInitialNotificationPromptSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY_NOTIFICATION_INTRO_SEEN, 'true');
+  } catch (e) {
+    console.warn('setInitialNotificationPromptSeen error:', e);
+  }
+}
+
+export async function getInitialNotificationOptIn(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(STORAGE_KEY_INITIAL_NOTIFICATION_OPT_IN)) === 'true';
+  } catch (e) {
+    console.warn('getInitialNotificationOptIn error:', e);
+    return false;
+  }
+}
+
+export async function setInitialNotificationOptIn(enabled: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY_INITIAL_NOTIFICATION_OPT_IN, enabled ? 'true' : 'false');
+  } catch (e) {
+    console.warn('setInitialNotificationOptIn error:', e);
+  }
+}
+
+export async function clearInitialNotificationOptIn(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY_INITIAL_NOTIFICATION_OPT_IN);
+  } catch (e) {
+    console.warn('clearInitialNotificationOptIn error:', e);
+  }
+}
+
+export async function requestPermission(
+  options: { showSettingsAlert?: boolean } = {},
+): Promise<boolean> {
+  try {
+    const { showSettingsAlert = true } = options;
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     if (existingStatus === 'granted') return true;
 
     const { status } = await Notifications.requestPermissionsAsync();
     if (status === 'granted') return true;
 
-    Alert.alert(
-      '알림 권한 필요',
-      '알림 설정에서 직접 허용해주세요.',
-      [
-        { text: '취소', style: 'cancel' },
-        { text: '설정으로 이동', onPress: () => Linking.openSettings() },
-      ],
-    );
+    if (showSettingsAlert) {
+      Alert.alert(
+        '알림 권한 필요',
+        '알림 설정에서 직접 허용해주세요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '설정으로 이동', onPress: () => Linking.openSettings() },
+        ],
+      );
+    }
     return false;
   } catch (e) {
     console.warn('requestPermission error:', e);

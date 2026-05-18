@@ -45,10 +45,14 @@ const getAppleAuthErrorCode = (error: unknown): string | undefined => {
 
 const getAppleAuthErrorMessage = (code?: string): string => {
   switch (code) {
+    case '1001':
     case 'ERR_REQUEST_CANCELED':
       return 'Apple 로그인이 취소됐어요.';
     case 'ERR_REQUEST_FAILED':
+    case 'ERR_INVALID_RESPONSE':
       return 'Apple 로그인 응답이 올바르지 않아요. 다시 시도해주세요.';
+    case 'ERR_REQUEST_NOT_HANDLED':
+      return 'Apple 로그인 요청을 처리하지 못했어요. 다시 시도해주세요.';
     case 'ERR_UNAVAILABLE':
     case 'ERR_NOT_AVAILABLE':
       return 'Apple 로그인은 iOS 13 이상의 실제 기기에서만 지원됩니다.';
@@ -57,12 +61,19 @@ const getAppleAuthErrorMessage = (code?: string): string => {
   }
 };
 
+const withAppleAuthCode = (message: string, code?: string): Error => {
+  const error = new Error(message) as Error & { code?: string };
+  error.code = code;
+  return error;
+};
+
 export async function loginWithApple(): Promise<AppleLoginResult> {
   console.log('[Apple Login] 시작');
 
   const isAvailable = await AppleAuthentication.isAvailableAsync();
+  console.log('[Apple Login] available:', isAvailable);
+
   if (!isAvailable) {
-    console.log('[Apple Login] 지원 안 됨');
     throw new Error('Apple 로그인은 iOS 13 이상의 실제 기기에서만 지원됩니다.');
   }
 
@@ -75,24 +86,23 @@ export async function loginWithApple(): Promise<AppleLoginResult> {
       ],
     });
 
-    console.log('[Apple Login] credential:', credential.user);
-    console.log('[Apple Login] identityToken:', !!credential.identityToken);
+    console.log('[Apple Login] credential:', {
+      user: credential.user,
+      identityToken: !!credential.identityToken,
+      email: !!credential.email,
+      fullName: !!credential.fullName,
+    });
 
     if (!credential.user) {
       console.warn('[Apple Login] credential.user 없음');
       throw new Error('Apple 로그인 사용자 정보를 받을 수 없어요. 다시 시도해주세요.');
     }
 
-    if (!credential.identityToken) {
-      console.warn('[Apple Login] identityToken 없음');
-      throw new Error('Apple 로그인 인증 토큰을 받을 수 없어요. 다시 시도해주세요.');
-    }
-
     const nameParts = [credential.fullName?.givenName, credential.fullName?.familyName]
       .filter((s): s is string => !!s);
     const fullName = nameParts.length > 0 ? nameParts.join(' ') : undefined;
 
-    console.log('[Apple Login] credential 검증 완료');
+    console.log('[Apple Login] 완료');
 
     return {
       appleId: credential.user,
@@ -105,7 +115,12 @@ export async function loginWithApple(): Promise<AppleLoginResult> {
       code,
       message: error instanceof Error ? error.message : String(error),
     });
-    throw new Error(getAppleAuthErrorMessage(code));
+
+    if (!code && error instanceof Error) {
+      throw error;
+    }
+
+    throw withAppleAuthCode(getAppleAuthErrorMessage(code), code);
   }
 }
 

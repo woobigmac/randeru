@@ -16,7 +16,7 @@
       "icon": "./assets/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.randeru.app",
-      "buildNumber": "35",
+      "buildNumber": "39",
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
@@ -71,6 +71,7 @@
         }
       ],
       "./plugins/withKakaoInit",
+      "expo-apple-authentication",
       "expo-font",
       [
         "expo-build-properties",

@@ -23,7 +23,14 @@ const isAppleAuthCanceled = (e: unknown): boolean => {
     typeof error.nativeErrorCode === 'string' ? error.nativeErrorCode : undefined;
   const message = typeof error.message === 'string' ? error.message : '';
 
-  return code === '1001' || nativeErrorCode === '1001' || message.includes('error 1001');
+  return (
+    code === '1001' ||
+    nativeErrorCode === '1001' ||
+    code === 'ERR_REQUEST_CANCELED' ||
+    nativeErrorCode === 'ERR_REQUEST_CANCELED' ||
+    message.includes('error 1001') ||
+    message.includes('취소')
+  );
 };
 
 export default function LoginScreen() {
