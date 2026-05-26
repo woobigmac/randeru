@@ -5,6 +5,12 @@ import NotificationSettingScreen from '../screens/settings/NotificationSettingSc
 import SettingScreen from '../screens/settings/SettingScreen';
 import ProfileEditScreen from '../screens/settings/ProfileEditScreen';
 import InquiryScreen from '../screens/settings/InquiryScreen';
+import FriendsScreen from '../screens/friends/FriendsScreen';
+import NotificationCenterScreen from '../screens/notifications/NotificationCenterScreen';
+import PhotoScreen from '../screens/record/PhotoScreen';
+import CompleteScreen from '../screens/record/CompleteScreen';
+import ShareScreen from '../screens/record/ShareScreen';
+import { Action, DailyRecord } from '../types';
 
 export type MyPageStackParamList = {
   MyPageMain: undefined;
@@ -12,6 +18,11 @@ export type MyPageStackParamList = {
   Setting: undefined;
   ProfileEdit: undefined;
   Inquiry: undefined;
+  Friends: undefined;
+  NotificationCenter: undefined;
+  Photo: { recordId: string; action: Action; friendActionShareId?: string };
+  Complete: { recordId: string; actionTitle?: string; source?: DailyRecord['source'] };
+  Share: { record: DailyRecord; action: Action };
 };
 
 const Stack = createStackNavigator<MyPageStackParamList>();
@@ -31,6 +42,11 @@ export default function MyPageStackNavigator() {
         options={{ headerShown: true, title: '설정', headerBackTitle: '' }}
       />
       <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+      <Stack.Screen name="Friends" component={FriendsScreen} />
+      <Stack.Screen name="NotificationCenter" component={NotificationCenterScreen} />
+      <Stack.Screen name="Photo" component={PhotoScreen} />
+      <Stack.Screen name="Complete" component={CompleteScreen} />
+      <Stack.Screen name="Share" component={ShareScreen} />
       <Stack.Screen
         name="Inquiry"
         component={InquiryScreen}

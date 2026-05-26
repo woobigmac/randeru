@@ -10,6 +10,12 @@ import {
   logoutApple,
   unlinkKakao,
 } from '../services/authService';
+import {
+  signInToFirebaseAnonymously,
+  signInToFirebaseWithAppleIdentityToken,
+  signInToFirebaseWithKakaoAccessToken,
+  signOutFirebaseAuth,
+} from '../services/firebaseAuthService';
 import { User } from '../types';
 import { DEFAULT_PUSH_TIME } from '../constants';
 
@@ -73,7 +79,17 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   loginWithKakao: async () => {
-    const { kakaoId, nickname, profileImage } = await kakaoLogin();
+    const { kakaoId, nickname, profileImage, accessToken } = await kakaoLogin();
+    let firebaseUid: string | undefined;
+    if (accessToken) {
+      try {
+        const firebaseSession = await signInToFirebaseWithKakaoAccessToken(accessToken);
+        firebaseUid = firebaseSession.uid;
+      } catch (e) {
+        console.warn('firebase kakao auth failed, continuing with existing kakao login:', e);
+      }
+    }
+
     const docId = `kakao_${kakaoId}`;
     const docRef = doc(db, 'users', docId);
     const docSnap = await getDoc(docRef);
@@ -84,6 +100,10 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (docSnap.exists()) {
       // 기존 유저 — Firestore 데이터 복원
       user = docSnap.data() as User;
+      if (firebaseUid && user.firebase_uid !== firebaseUid) {
+        user = { ...user, firebase_uid: firebaseUid };
+        await setDoc(docRef, { firebase_uid: firebaseUid }, { merge: true });
+      }
       isNewUser = false;
     } else {
       // 신규 유저 생성
@@ -96,6 +116,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         push_enabled: false,
         push_time: DEFAULT_PUSH_TIME,
         created_at: new Date(),
+        ...(firebaseUid && { firebase_uid: firebaseUid }),
       };
       await setDoc(docRef, user);
       isNewUser = true;
@@ -116,7 +137,17 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   loginWithApple: async () => {
-    const { appleId, fullName } = await appleLogin();
+    const { appleId, fullName, identityToken } = await appleLogin();
+    let firebaseUid: string | undefined;
+    if (identityToken) {
+      try {
+        const firebaseSession = await signInToFirebaseWithAppleIdentityToken(identityToken);
+        firebaseUid = firebaseSession.uid;
+      } catch (e) {
+        console.warn('firebase apple auth failed, continuing with existing apple login:', e);
+      }
+    }
+
     const docId = `apple_${appleId}`;
     const docRef = doc(db, 'users', docId);
     const docSnap = await getDoc(docRef);
@@ -126,6 +157,10 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     if (docSnap.exists()) {
       user = docSnap.data() as User;
+      if (firebaseUid && user.firebase_uid !== firebaseUid) {
+        user = { ...user, firebase_uid: firebaseUid };
+        await setDoc(docRef, { firebase_uid: firebaseUid }, { merge: true });
+      }
       isNewUser = false;
     } else {
       user = {
@@ -135,6 +170,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         push_enabled: false,
         push_time: DEFAULT_PUSH_TIME,
         created_at: new Date(),
+        ...(firebaseUid && { firebase_uid: firebaseUid }),
       };
       await setDoc(docRef, user);
       isNewUser = true;
@@ -155,6 +191,14 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   loginAsGuest: async () => {
+    let firebaseUid: string | undefined;
+    try {
+      const firebaseSession = await signInToFirebaseAnonymously();
+      firebaseUid = firebaseSession.uid;
+    } catch (e) {
+      console.warn('firebase anonymous auth failed, continuing as local guest:', e);
+    }
+
     const user: User = {
       user_id: generateUserId(),
       nickname: '게스트',
@@ -162,9 +206,17 @@ export const useUserStore = create<UserState>((set, get) => ({
       push_enabled: false,
       push_time: DEFAULT_PUSH_TIME,
       created_at: new Date(),
+      ...(firebaseUid && { firebase_uid: firebaseUid }),
     };
 
     await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+    if (firebaseUid) {
+      try {
+        await setDoc(doc(db, 'users', user.user_id), user, { merge: true });
+      } catch (e) {
+        console.warn('guest user firestore bootstrap failed:', e);
+      }
+    }
     set({ user, isLoggedIn: true, isOnboardingComplete: false });
   },
 
@@ -278,6 +330,9 @@ export const useUserStore = create<UserState>((set, get) => ({
   clearUser: async () => {
     set({ user: null, isOnboardingComplete: false, isLoggedIn: false });
     try {
+      await signOutFirebaseAuth().catch((e) => {
+        console.warn('firebase auth signOut error:', e);
+      });
       await AsyncStorage.multiRemove([STORAGE_KEY_USER, STORAGE_KEY_ONBOARDING]);
     } catch (e) {
       console.error('clearUser error:', e);

@@ -7,15 +7,17 @@ export interface KakaoLoginResult {
   kakaoId: string;
   nickname: string;
   profileImage?: string;
+  accessToken?: string;
 }
 
 export async function loginWithKakao(): Promise<KakaoLoginResult> {
-  await login();
+  const token = await login();
   const profile: KakaoUser = await me();
   return {
     kakaoId: String(profile.id),
     nickname: profile.nickname ?? '랜데루 유저',
     profileImage: profile.profileImageUrl ?? undefined,
+    accessToken: token.accessToken,
   };
 }
 
@@ -33,6 +35,7 @@ export interface AppleLoginResult {
   appleId: string;
   email?: string;
   fullName?: string;
+  identityToken?: string;
 }
 
 const getAppleAuthErrorCode = (error: unknown): string | undefined => {
@@ -108,6 +111,7 @@ export async function loginWithApple(): Promise<AppleLoginResult> {
       appleId: credential.user,
       email: credential.email ?? undefined,
       fullName,
+      identityToken: credential.identityToken ?? undefined,
     };
   } catch (error) {
     const code = getAppleAuthErrorCode(error);

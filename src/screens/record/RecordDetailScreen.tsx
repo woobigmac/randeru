@@ -18,6 +18,7 @@ const formatDate = (d: string) => d.replace(/-/g, '.');
 
 export default function RecordDetailScreen({ navigation, route }: Props) {
   const { record, action } = route.params;
+  const friendParticipants = record.friend_participants ?? [];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -53,6 +54,27 @@ export default function RecordDetailScreen({ navigation, route }: Props) {
           <View style={styles.card}>
             <Text style={styles.cardLabel}>메모</Text>
             <Text style={styles.memoText}>{record.memo}</Text>
+          </View>
+        ) : null}
+
+        {friendParticipants.length > 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>함께한 친구</Text>
+            {friendParticipants.map((friend) => (
+              <View key={friend.user_id} style={styles.friendRow}>
+                <View style={styles.friendAvatar}>
+                  <Text style={styles.friendAvatarText}>
+                    {friend.nickname.trim().slice(0, 1) || '란'}
+                  </Text>
+                </View>
+                <View style={styles.friendTextArea}>
+                  <Text style={styles.friendName}>{friend.nickname}</Text>
+                  <Text style={styles.friendStatus}>
+                    {friend.status === 'completed' ? '완료했어요' : '함께 진행 중'}
+                  </Text>
+                </View>
+              </View>
+            ))}
           </View>
         ) : null}
 
@@ -116,6 +138,24 @@ const styles = StyleSheet.create({
   },
   memoText: { fontSize: 15, color: Colors.text, lineHeight: 24, fontStyle: 'italic' },
   copyText: { fontSize: 14, color: Colors.text, lineHeight: 22 },
+  friendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.xs,
+  },
+  friendAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  friendAvatarText: { fontSize: 14, fontWeight: '700', color: Colors.primaryDark },
+  friendTextArea: { flex: 1 },
+  friendName: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  friendStatus: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
   buttonArea: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.lg,

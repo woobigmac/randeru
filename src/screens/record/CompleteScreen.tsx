@@ -3,17 +3,22 @@ import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
-import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { useActionStore } from '../../store/useActionStore';
 import { useRecordStore } from '../../store/useRecordStore';
 import { useUserStore } from '../../store/useUserStore';
 import { Button } from '../../components/Button';
 import { TouchableOpacity } from 'react-native';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
+import { Action, DailyRecord } from '../../types';
+
+type CompleteStackParamList = {
+  Complete: { recordId: string; actionTitle?: string; source?: DailyRecord['source'] };
+  Share: { record: DailyRecord; action: Action };
+};
 
 type Props = {
-  navigation: StackNavigationProp<HomeStackParamList, 'Complete'>;
-  route: RouteProp<HomeStackParamList, 'Complete'>;
+  navigation: StackNavigationProp<CompleteStackParamList, 'Complete'>;
+  route: RouteProp<CompleteStackParamList, 'Complete'>;
 };
 
 function ShareButton({ onPress }: { onPress: () => void }) {
@@ -24,10 +29,14 @@ function ShareButton({ onPress }: { onPress: () => void }) {
   );
 }
 
-export default function CompleteScreen({ navigation }: Props) {
+export default function CompleteScreen({ navigation, route }: Props) {
   const { todayAction, todayRecord } = useActionStore();
   const user = useUserStore((s) => s.user);
   const { stats, loadRecords } = useRecordStore();
+  const isFriendAction = route.params.source === 'friend_share';
+  const completedActionTitle = isFriendAction
+    ? route.params.actionTitle
+    : todayAction?.title ?? route.params.actionTitle;
 
   useEffect(() => {
     // 완료 후 최신 통계 로드
@@ -41,7 +50,8 @@ export default function CompleteScreen({ navigation }: Props) {
         <View style={styles.topArea}>
           <Text style={styles.title}>오늘도{'\n'}해냈어요!</Text>
           <Text style={styles.subtitle}>
-            {todayAction?.title ?? '훌륭한 액션'}{'\n'}을 완료했어요
+            {completedActionTitle ?? '훌륭한 액션'}{'\n'}
+            {isFriendAction ? '친구와 함께 완료했어요' : '을 완료했어요'}
           </Text>
         </View>
 

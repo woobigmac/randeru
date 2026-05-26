@@ -16,8 +16,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, AVPlaybackStatus, ResizeMode } from 'expo-av';
-import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { uploadMedia, updateRecord } from '../../services/recordService';
+import { completeReceivedActionShare } from '../../services/friendActionService';
 import { useActionStore } from '../../store/useActionStore';
 import { useUserStore } from '../../store/useUserStore';
 import { MAX_VIDEO_DURATION } from '../../constants';
@@ -26,11 +26,16 @@ import { Button } from '../../components/Button';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 import { logActionCompleted } from '../../services/analyticsService';
 import { trackActionActivity } from '../../services/actionActivityService';
-import { DailyRecord } from '../../types';
+import { Action, DailyRecord } from '../../types';
+
+type PhotoStackParamList = {
+  Photo: { recordId: string; action: Action; friendActionShareId?: string };
+  Complete: { recordId: string; actionTitle?: string; source?: DailyRecord['source'] };
+};
 
 type Props = {
-  navigation: StackNavigationProp<HomeStackParamList, 'Photo'>;
-  route: RouteProp<HomeStackParamList, 'Photo'>;
+  navigation: StackNavigationProp<PhotoStackParamList, 'Photo'>;
+  route: RouteProp<PhotoStackParamList, 'Photo'>;
 };
 
 const fmtSec = (secs: number) => {
@@ -191,7 +196,7 @@ const tabStyles = StyleSheet.create({
 
 // ─── 메인 PhotoScreen ─────────────────────────────────────────────────────────
 export default function PhotoScreen({ navigation, route }: Props) {
-  const { recordId, action } = route.params;
+  const { recordId, action, friendActionShareId } = route.params;
   const { setActionCompleted } = useActionStore();
   const user = useUserStore((s) => s.user);
 
@@ -291,6 +296,12 @@ export default function PhotoScreen({ navigation, route }: Props) {
         completed_at: new Date(),
       };
       await updateRecord(recordId, completedRecord);
+      if (friendActionShareId) {
+        if (!user) {
+          throw new Error('로그인 정보가 필요해요.');
+        }
+        await completeReceivedActionShare(friendActionShareId, user);
+      }
       setActionCompleted(completedRecord);
       logActionCompleted(action.action_id, action.category, !!mediaUri);
       trackActionActivity(user?.user_id, action, 'completed', {
@@ -299,7 +310,11 @@ export default function PhotoScreen({ navigation, route }: Props) {
         captured_media_type: activeTab,
         memo_written: !!memo.trim(),
       });
-      navigation.navigate('Complete', { recordId });
+      navigation.navigate('Complete', {
+        recordId,
+        actionTitle: action.title,
+        source: friendActionShareId ? 'friend_share' : 'daily',
+      });
     } catch (e) {
       console.error('handleSave error:', e);
       Alert.alert('오류', '저장 중 문제가 발생했어요. 다시 시도해주세요.');

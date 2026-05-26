@@ -87,7 +87,7 @@ export async function getTodaySlots(userId: string): Promise<DailySlotStatus[]> 
     const snapshot = await firestoreTimeout(getDocs(q));
     const todayRecords = snapshot.docs.map(
       (d) => ({ record_id: d.id, ...d.data() } as DailyRecord),
-    );
+    ).filter((record) => record.source !== 'friend_share');
 
     // action 일괄 조회
     const actionIds = [...new Set(todayRecords.map((r) => r.action_id))];

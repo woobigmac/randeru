@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,11 @@ import {
   SafeAreaView as RNSafeAreaView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { getUnreadNotificationCount } from '../../services/inAppNotificationService';
 import { useUserStore } from '../../store/useUserStore';
 import { useRecordStore } from '../../store/useRecordStore';
 import { MyPageStackParamList } from '../../navigation/MyPageStackNavigator';
@@ -83,10 +85,22 @@ export default function MyPageScreen({ navigation }: Props) {
   const deleteAccount = useUserStore((s) => s.deleteAccount);
   const { stats, loadRecords } = useRecordStore();
   const [policyModal, setPolicyModal] = useState<PolicyModal>(null);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   useEffect(() => {
     if (user?.user_id) loadRecords(user.user_id);
   }, [user?.user_id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.user_id) return;
+      void getUnreadNotificationCount(user.user_id)
+        .then(setUnreadNotificationCount)
+        .catch((error) => {
+          console.warn('getUnreadNotificationCount error:', error);
+        });
+    }, [user?.user_id]),
+  );
 
   const handleLogout = () => {
     Alert.alert('로그아웃', '정말 로그아웃 하시겠어요?', [
@@ -157,6 +171,16 @@ export default function MyPageScreen({ navigation }: Props) {
 
         {/* 메뉴 */}
         <View style={styles.menuSection}>
+          <MenuItem icon="👥" label="친구 초대 및 관리" onPress={() => navigation.navigate('Friends')} />
+          <MenuItem
+            icon="🔔"
+            label={
+              unreadNotificationCount > 0
+                ? `알림 ${unreadNotificationCount}`
+                : '알림'
+            }
+            onPress={() => navigation.navigate('NotificationCenter')}
+          />
           <MenuItem icon="🔔" label="알림 설정" onPress={() => navigation.navigate('NotificationSetting')} />
           <MenuItem icon="📄" label="이용약관" onPress={() => setPolicyModal('terms')} />
           <MenuItem icon="🔐" label="개인정보처리방침" onPress={() => setPolicyModal('privacy')} />
