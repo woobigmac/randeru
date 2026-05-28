@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Image, ScrollView, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, View, Text, Image, ScrollView, StyleSheet } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -8,6 +8,10 @@ import { RecordsStackParamList } from '../../navigation/RecordsStackNavigator';
 import { Header } from '../../components/Header';
 import { Button } from '../../components/Button';
 import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
+import {
+  FriendActionRecordEntry,
+  getFriendActionRecords,
+} from '../../services/friendActionService';
 
 type Props = {
   navigation: StackNavigationProp<RecordsStackParamList, 'RecordDetail'>;
@@ -19,6 +23,35 @@ const formatDate = (d: string) => d.replace(/-/g, '.');
 export default function RecordDetailScreen({ navigation, route }: Props) {
   const { record, action } = route.params;
   const friendParticipants = record.friend_participants ?? [];
+  const [friendRecords, setFriendRecords] = useState<FriendActionRecordEntry[]>([]);
+  const [isLoadingFriendRecords, setIsLoadingFriendRecords] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!record.friend_action_share_id) {
+      setFriendRecords([]);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    setIsLoadingFriendRecords(true);
+    getFriendActionRecords(record.record_id)
+      .then((records) => {
+        if (mounted) setFriendRecords(records);
+      })
+      .catch((error) => {
+        console.warn('getFriendActionRecords error:', error);
+        if (mounted) setFriendRecords([]);
+      })
+      .finally(() => {
+        if (mounted) setIsLoadingFriendRecords(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [record.record_id, record.friend_action_share_id]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -78,6 +111,51 @@ export default function RecordDetailScreen({ navigation, route }: Props) {
           </View>
         ) : null}
 
+        {friendParticipants.length > 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>함께 남긴 기록</Text>
+            {isLoadingFriendRecords ? (
+              <View style={styles.friendRecordLoading}>
+                <ActivityIndicator color={Colors.primary} />
+              </View>
+            ) : friendRecords.length > 0 ? (
+              <View style={styles.friendRecordList}>
+                {friendRecords.map((friendRecord) => (
+                  <View key={friendRecord.record_id} style={styles.friendRecordItem}>
+                    <View style={styles.friendRecordHeader}>
+                      <View style={styles.friendAvatarSmall}>
+                        <Text style={styles.friendAvatarText}>
+                          {friendRecord.nickname.trim().slice(0, 1) || '랜'}
+                        </Text>
+                      </View>
+                      <View style={styles.friendTextArea}>
+                        <Text style={styles.friendName}>
+                          {friendRecord.is_me ? '나' : friendRecord.nickname}
+                        </Text>
+                        <Text style={styles.friendStatus}>
+                          {friendRecord.completed_at ? '완료한 기록' : '함께 진행 중'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <FriendRecordMedia record={friendRecord} />
+
+                    {friendRecord.memo ? (
+                      <Text style={styles.friendRecordMemo}>{friendRecord.memo}</Text>
+                    ) : (
+                      <Text style={styles.friendRecordEmptyMemo}>남긴 한마디가 없어요</Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.friendRecordEmpty}>
+                친구가 완료하면 사진과 한마디가 여기에 모여요.
+              </Text>
+            )}
+          </View>
+        ) : null}
+
         {/* 공유 문구 */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>공유 문구</Text>
@@ -93,6 +171,33 @@ export default function RecordDetailScreen({ navigation, route }: Props) {
         />
       </View>
     </SafeAreaView>
+  );
+}
+
+function FriendRecordMedia({ record }: { record: FriendActionRecordEntry }) {
+  const mediaUrl = record.media_url ?? record.photo_url;
+  const thumbnailUrl = record.thumbnail_url ?? mediaUrl;
+  if (!mediaUrl) {
+    return (
+      <View style={styles.friendRecordMediaPlaceholder}>
+        <Text style={styles.photoPlaceholderText}>사진 없음</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <Image
+        source={{ uri: thumbnailUrl ?? mediaUrl }}
+        style={styles.friendRecordMedia}
+        resizeMode="cover"
+      />
+      {record.media_type === 'video' ? (
+        <View style={styles.videoBadge}>
+          <Text style={styles.videoBadgeText}>▶</Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -156,6 +261,70 @@ const styles = StyleSheet.create({
   friendTextArea: { flex: 1 },
   friendName: { fontSize: 14, fontWeight: '700', color: Colors.text },
   friendStatus: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  friendRecordLoading: {
+    minHeight: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendRecordList: { gap: Spacing.md },
+  friendRecordItem: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.md,
+  },
+  friendRecordHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  friendAvatarSmall: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  friendRecordMedia: {
+    width: '100%',
+    height: 160,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.background,
+  },
+  friendRecordMediaPlaceholder: {
+    width: '100%',
+    height: 96,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendRecordMemo: {
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 22,
+    marginTop: Spacing.sm,
+  },
+  friendRecordEmptyMemo: {
+    fontSize: 13,
+    color: Colors.textTertiary,
+    lineHeight: 20,
+    marginTop: Spacing.sm,
+  },
+  friendRecordEmpty: { fontSize: 14, color: Colors.textSecondary, lineHeight: 22 },
+  videoBadge: {
+    position: 'absolute',
+    left: Spacing.sm,
+    bottom: Spacing.sm,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.58)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoBadgeText: { color: Colors.white, fontSize: 12, fontWeight: '700' },
   buttonArea: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.lg,

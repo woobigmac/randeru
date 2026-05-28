@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Linking } from 'react-native';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useUserStore } from '../store/useUserStore';
 import SplashScreen from '../screens/onboarding/SplashScreen';
@@ -16,6 +18,7 @@ import {
   registerPushToken,
   scheduleDailySlotNotifications,
 } from '../services/notificationService';
+import { parseInviteCodeFromUrl } from '../services/deepLinkService';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -28,6 +31,7 @@ export type RootStackParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const {
     user,
     isLoading,
@@ -37,6 +41,7 @@ export default function RootNavigator() {
   } = useUserStore();
   const [isNotificationIntroLoading, setIsNotificationIntroLoading] = useState(true);
   const [hasSeenNotificationIntro, setHasSeenNotificationIntro] = useState(false);
+  const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -53,6 +58,63 @@ export default function RootNavigator() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const handleUrl = (url: string | null) => {
+      if (!url) return;
+      const inviteCode = parseInviteCodeFromUrl(url);
+      if (inviteCode) setPendingInviteCode(inviteCode);
+    };
+
+    Linking.getInitialURL()
+      .then((url) => {
+        if (isMounted) handleUrl(url);
+      })
+      .catch((e) => {
+        console.warn('getInitialURL error:', e);
+      });
+
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleUrl(url);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      !pendingInviteCode ||
+      isLoading ||
+      isNotificationIntroLoading ||
+      !hasSeenNotificationIntro ||
+      !isLoggedIn ||
+      !isOnboardingComplete
+    ) {
+      return;
+    }
+
+    navigation.navigate('Main', {
+      screen: 'MyPage',
+      params: {
+        screen: 'Friends',
+        params: { inviteCode: pendingInviteCode },
+      },
+    } as never);
+    setPendingInviteCode(null);
+  }, [
+    hasSeenNotificationIntro,
+    isLoading,
+    isLoggedIn,
+    isNotificationIntroLoading,
+    isOnboardingComplete,
+    navigation,
+    pendingInviteCode,
+  ]);
 
   useEffect(() => {
     if (!hasSeenNotificationIntro || !isLoggedIn || !isOnboardingComplete || !user?.user_id) {

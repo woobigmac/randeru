@@ -18,7 +18,7 @@ export type MyPageStackParamList = {
   Setting: undefined;
   ProfileEdit: undefined;
   Inquiry: undefined;
-  Friends: undefined;
+  Friends: { inviteCode?: string } | undefined;
   NotificationCenter: undefined;
   Photo: { recordId: string; action: Action; friendActionShareId?: string };
   Complete: { recordId: string; actionTitle?: string; source?: DailyRecord['source'] };

@@ -8,9 +8,32 @@ import {
   Timestamp,
   where,
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from './firebase';
-import { queueNotificationInTransaction } from './inAppNotificationService';
+import app from './firebase';
+import { queueNotificationInTransaction, sendNotificationPush } from './inAppNotificationService';
 import { Action, DailyRecord, Friend, FriendActionShare, User } from '../types';
+
+const DEFAULT_FUNCTIONS_REGION = 'asia-northeast3';
+const functionsRegion =
+  process.env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION || DEFAULT_FUNCTIONS_REGION;
+const functions = getFunctions(app, functionsRegion);
+
+export interface FriendActionRecordEntry {
+  record_id: string;
+  user_id: string;
+  nickname: string;
+  profileImage?: string | null;
+  is_me: boolean;
+  status?: string | null;
+  source?: string | null;
+  memo?: string | null;
+  media_url?: string | null;
+  photo_url?: string | null;
+  media_type?: 'photo' | 'video' | null;
+  thumbnail_url?: string | null;
+  completed_at?: string | null;
+}
 
 const getTodayDate = (): string => {
   const d = new Date();
@@ -59,6 +82,7 @@ export async function shareActionWithFriend(
   senderRecordId?: string,
 ): Promise<FriendActionShare> {
   const shareRef = doc(collection(db, 'friend_action_shares'));
+  let notificationId: string | null = null;
   const shareData = {
     sender_id: sender.user_id,
     sender_nickname: sender.nickname,
@@ -97,7 +121,7 @@ export async function shareActionWithFriend(
       }, { merge: true });
     }
 
-    queueNotificationInTransaction(transaction, friend.friend_user_id, {
+    notificationId = queueNotificationInTransaction(transaction, friend.friend_user_id, {
       type: 'friend_action_shared',
       title: '친구가 액션을 보냈어요',
       body: `${sender.nickname}님이 "${action.title}" 액션을 함께하자고 보냈어요.`,
@@ -108,6 +132,12 @@ export async function shareActionWithFriend(
       friend_action_share_id: shareRef.id,
     });
   });
+
+  if (notificationId) {
+    sendNotificationPush(friend.friend_user_id, notificationId).catch((error) => {
+      console.warn('sendNotificationPush friend_action_shared error:', error);
+    });
+  }
 
   return {
     share_id: shareRef.id,
@@ -156,6 +186,7 @@ export async function startReceivedActionShare(
   const shareRef = doc(db, 'friend_action_shares', share.share_id);
   const today = getTodayDate();
   const acceptedAt = new Date();
+  let notificationId: string | null = null;
 
   const record = await runTransaction(db, async (transaction) => {
     const shareSnap = await transaction.get(shareRef);
@@ -224,7 +255,7 @@ export async function startReceivedActionShare(
       }, { merge: true });
     }
 
-    queueNotificationInTransaction(transaction, latestShare.sender_id, {
+    notificationId = queueNotificationInTransaction(transaction, latestShare.sender_id, {
       type: 'friend_action_started',
       title: '친구가 액션을 시작했어요',
       body: `${user.nickname}님이 "${latestShare.action_title}" 액션을 시작했어요.`,
@@ -245,6 +276,12 @@ export async function startReceivedActionShare(
       })),
     } as DailyRecord;
   });
+
+  if (notificationId) {
+    sendNotificationPush(share.sender_id, notificationId).catch((error) => {
+      console.warn('sendNotificationPush friend_action_started error:', error);
+    });
+  }
 
   return record;
 }
@@ -268,6 +305,8 @@ function upsertParticipant(
 
 export async function completeReceivedActionShare(shareId: string, completedBy: User): Promise<void> {
   const shareRef = doc(db, 'friend_action_shares', shareId);
+  let senderId: string | null = null;
+  let notificationId: string | null = null;
   await runTransaction(db, async (transaction) => {
     const shareSnap = await transaction.get(shareRef);
     if (!shareSnap.exists()) {
@@ -275,6 +314,7 @@ export async function completeReceivedActionShare(shareId: string, completedBy: 
     }
 
     const latestShare = mapFriendActionShare(shareSnap.id, shareSnap.data());
+    senderId = latestShare.sender_id;
     if (latestShare.recipient_id !== completedBy.user_id) {
       throw new Error('내게 공유된 액션만 완료할 수 있어요.');
     }
@@ -309,7 +349,7 @@ export async function completeReceivedActionShare(shareId: string, completedBy: 
       }, { merge: true });
     }
 
-    queueNotificationInTransaction(transaction, latestShare.sender_id, {
+    notificationId = queueNotificationInTransaction(transaction, latestShare.sender_id, {
       type: 'friend_action_completed',
       title: '친구가 액션을 완료했어요',
       body: `${completedBy.nickname}님이 "${latestShare.action_title}" 액션을 완료했어요.`,
@@ -320,4 +360,53 @@ export async function completeReceivedActionShare(shareId: string, completedBy: 
       friend_action_share_id: latestShare.share_id,
     });
   });
+
+  if (senderId && notificationId) {
+    sendNotificationPush(senderId, notificationId).catch((error) => {
+      console.warn('sendNotificationPush friend_action_completed error:', error);
+    });
+  }
+}
+
+function mapFriendActionRecordEntry(value: unknown): FriendActionRecordEntry | null {
+  if (!value || typeof value !== 'object') return null;
+  const data = value as Record<string, unknown>;
+  const recordId = optionalString(data.record_id);
+  const userId = optionalString(data.user_id);
+  const nickname = optionalString(data.nickname);
+  if (!recordId || !userId || !nickname) return null;
+
+  const mediaType = data.media_type === 'photo' || data.media_type === 'video'
+    ? data.media_type
+    : null;
+
+  return {
+    record_id: recordId,
+    user_id: userId,
+    nickname,
+    profileImage: optionalString(data.profileImage) ?? null,
+    is_me: data.is_me === true,
+    status: optionalString(data.status) ?? null,
+    source: optionalString(data.source) ?? null,
+    memo: optionalString(data.memo) ?? null,
+    media_url: optionalString(data.media_url) ?? null,
+    photo_url: optionalString(data.photo_url) ?? null,
+    media_type: mediaType,
+    thumbnail_url: optionalString(data.thumbnail_url) ?? null,
+    completed_at: optionalString(data.completed_at) ?? null,
+  };
+}
+
+export async function getFriendActionRecords(
+  recordId: string,
+): Promise<FriendActionRecordEntry[]> {
+  const callable = httpsCallable<
+    { recordId: string },
+    { records?: unknown }
+  >(functions, 'getFriendActionRecords');
+  const result = await callable({ recordId });
+  const records = Array.isArray(result.data.records) ? result.data.records : [];
+  return records
+    .map(mapFriendActionRecordEntry)
+    .filter((entry): entry is FriendActionRecordEntry => entry !== null);
 }

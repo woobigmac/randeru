@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   SectionListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useUserStore } from '../../store/useUserStore';
@@ -91,9 +91,11 @@ export default function RecordsScreen() {
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const [activeFilter, setActiveFilter] = useState<RecordFilter>('all');
 
-  useEffect(() => {
-    if (user?.user_id) loadRecords(user.user_id);
-  }, [user?.user_id]);
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.user_id) void loadRecords(user.user_id);
+    }, [user?.user_id, loadRecords]),
+  );
 
   const allRecords = getRecordsWithActions();
   const filteredRecords = filterRecords(allRecords, activeFilter);

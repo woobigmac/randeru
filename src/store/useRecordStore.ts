@@ -48,9 +48,14 @@ export const useRecordStore = create<RecordStoreState>((set, get) => ({
         getUserRecords(userId),
         getUserStats(userId),
       ]);
-      const recordsWithActions = await Promise.all(
+      const recordResults = await Promise.allSettled(
         rawRecords.map((r) => getRecordWithAction(r)),
       );
+      const recordsWithActions = recordResults.flatMap((result) => {
+        if (result.status === 'fulfilled') return [result.value];
+        console.warn('getRecordWithAction skipped:', result.reason);
+        return [];
+      });
       set({ recordsWithActions, stats, isLoading: false });
     } catch (e) {
       console.error('loadRecords error:', e);

@@ -13,6 +13,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Header } from '../../components/Header';
 import { Button } from '../../components/Button';
@@ -37,10 +38,20 @@ import { Colors, Fonts, Radius, Spacing } from '../../constants/theme';
 
 type Props = {
   navigation: StackNavigationProp<MyPageStackParamList, 'Friends'>;
+  route: RouteProp<MyPageStackParamList, 'Friends'>;
+};
+
+type FriendManageSection = 'friends' | 'receivedActions' | 'sentActions' | 'sentInvites';
+
+const FRIEND_SECTION_LABEL: Record<FriendManageSection, string> = {
+  friends: '내 친구',
+  receivedActions: '받은 액션',
+  sentActions: '보낸 액션',
+  sentInvites: '보낸 초대',
 };
 
 function getInitial(name: string): string {
-  return name.trim().slice(0, 1) || '란';
+  return name.trim().slice(0, 1) || '랜';
 }
 
 function formatInviteStatus(invite: FriendInvite): string {
@@ -80,7 +91,7 @@ function getActionShareStatusStyle(status: FriendActionShare['status']) {
   return styles.statusPending;
 }
 
-export default function FriendsScreen({ navigation }: Props) {
+export default function FriendsScreen({ navigation, route }: Props) {
   const user = useUserStore((state) => state.user);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [sentInvites, setSentInvites] = useState<FriendInvite[]>([]);
@@ -92,11 +103,19 @@ export default function FriendsScreen({ navigation }: Props) {
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [isAcceptingInvite, setIsAcceptingInvite] = useState(false);
   const [startingShareId, setStartingShareId] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<FriendManageSection>('friends');
 
   const latestPendingInvite = useMemo(
     () => sentInvites.find((invite) => invite.status === 'pending') ?? null,
     [sentInvites],
   );
+
+  const sectionCounts: Record<FriendManageSection, number> = {
+    friends: friends.length,
+    receivedActions: receivedActionShares.length,
+    sentActions: sentActionShares.length,
+    sentInvites: sentInvites.length,
+  };
 
   const loadFriendsData = useCallback(async () => {
     if (!user?.user_id) return;
@@ -160,11 +179,11 @@ export default function FriendsScreen({ navigation }: Props) {
     Alert.alert('초대 코드 복사 완료', '친구에게 코드를 보내주세요.');
   };
 
-  const handleAcceptInvite = async () => {
+  const acceptInviteCode = async (code: string) => {
     if (!user) return;
     setIsAcceptingInvite(true);
     try {
-      const friend = await acceptFriendInvite(inviteCode, user);
+      const friend = await acceptFriendInvite(code, user);
       setInviteCode('');
       Alert.alert('친구 등록 완료', `${friend.nickname}님과 친구가 되었어요.`);
       await loadFriendsData();
@@ -175,6 +194,26 @@ export default function FriendsScreen({ navigation }: Props) {
       setIsAcceptingInvite(false);
     }
   };
+
+  const handleAcceptInvite = async () => {
+    await acceptInviteCode(inviteCode);
+  };
+
+  useEffect(() => {
+    const linkedInviteCode = route.params?.inviteCode;
+    if (!linkedInviteCode || !user) return;
+
+    setInviteCode(linkedInviteCode);
+    navigation.setParams({ inviteCode: undefined });
+    Alert.alert(
+      '친구 초대 도착',
+      `초대 코드 ${linkedInviteCode}로 친구를 등록할까요?`,
+      [
+        { text: '나중에', style: 'cancel' },
+        { text: '등록', onPress: () => acceptInviteCode(linkedInviteCode) },
+      ],
+    );
+  }, [navigation, route.params?.inviteCode, user]);
 
   const handleStartActionShare = async (share: FriendActionShare) => {
     if (!user) return;
@@ -269,90 +308,135 @@ export default function FriendsScreen({ navigation }: Props) {
           </View>
         </View>
 
-        <View style={styles.listHeader}>
-          <Text style={styles.sectionTitle}>내 친구</Text>
+        <View style={styles.segmentHeader}>
+          <View style={styles.segmentedControl}>
+            {(Object.keys(FRIEND_SECTION_LABEL) as FriendManageSection[]).map((section) => {
+              const isActive = activeSection === section;
+              return (
+                <TouchableOpacity
+                  key={section}
+                  onPress={() => setActiveSection(section)}
+                  style={[styles.segmentButton, isActive && styles.segmentButtonActive]}
+                  activeOpacity={0.85}
+                >
+                  <Text
+                    style={[styles.segmentButtonText, isActive && styles.segmentButtonTextActive]}
+                    numberOfLines={1}
+                  >
+                    {FRIEND_SECTION_LABEL[section]}
+                  </Text>
+                  <Text
+                    style={[styles.segmentCountText, isActive && styles.segmentButtonTextActive]}
+                    numberOfLines={1}
+                  >
+                    {sectionCounts[section]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           {isLoading ? <ActivityIndicator color={Colors.primary} /> : null}
         </View>
 
-        {friends.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>아직 등록된 친구가 없어요</Text>
-            <Text style={styles.emptyText}>첫 친구를 초대해서 함께 액션을 시작해보세요.</Text>
-          </View>
-        ) : (
-          <View style={styles.friendList}>
-            {friends.map((friend) => (
-              <View key={friend.friend_user_id} style={styles.friendItem}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{getInitial(friend.nickname)}</Text>
+        {activeSection === 'friends' ? (
+          friends.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>아직 등록된 친구가 없어요</Text>
+              <Text style={styles.emptyText}>첫 친구를 초대해서 함께 액션을 시작해보세요.</Text>
+            </View>
+          ) : (
+            <View style={styles.friendList}>
+              {friends.map((friend) => (
+                <View key={friend.friend_user_id} style={styles.friendItem}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{getInitial(friend.nickname)}</Text>
+                  </View>
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{friend.nickname}</Text>
+                    <Text style={styles.friendMeta}>함께한 액션 기록 준비 중</Text>
+                  </View>
                 </View>
-                <View style={styles.friendInfo}>
-                  <Text style={styles.friendName}>{friend.nickname}</Text>
-                  <Text style={styles.friendMeta}>함께한 액션 기록 준비 중</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {receivedActionShares.length > 0 ? (
-          <View style={styles.receivedActions}>
-            <Text style={styles.sectionTitle}>받은 액션</Text>
-            {receivedActionShares.map((share) => (
-              <View key={share.share_id} style={styles.actionShareItem}>
-                <View style={styles.actionShareTextArea}>
-                  <Text style={styles.actionShareTitle} numberOfLines={1}>
-                    {share.action_title}
-                  </Text>
-                  <Text style={styles.actionShareMeta} numberOfLines={1}>
-                    {share.sender_nickname}님이 함께하자고 보냈어요
-                  </Text>
-                </View>
-                <Button
-                  label={share.status === 'started' ? '인증' : '시작'}
-                  onPress={() => handleStartActionShare(share)}
-                  loading={startingShareId === share.share_id}
-                  disabled={startingShareId !== null}
-                  style={styles.startActionButton}
-                />
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )
         ) : null}
 
-        {sentActionShares.length > 0 ? (
-          <View style={styles.sentActions}>
-            <Text style={styles.sectionTitle}>보낸 액션</Text>
-            {sentActionShares.slice(0, 5).map((share) => (
-              <View key={share.share_id} style={styles.sentActionItem}>
-                <View style={styles.actionShareTextArea}>
-                  <Text style={styles.actionShareTitle} numberOfLines={1}>
-                    {share.action_title}
-                  </Text>
-                  <Text style={styles.actionShareMeta} numberOfLines={1}>
-                    {share.recipient_nickname}님에게 보냈어요
-                  </Text>
+        {activeSection === 'receivedActions' ? (
+          receivedActionShares.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>받은 액션이 없어요</Text>
+              <Text style={styles.emptyText}>친구가 함께할 액션을 보내면 여기에 표시돼요.</Text>
+            </View>
+          ) : (
+            <View style={styles.receivedActions}>
+              {receivedActionShares.map((share) => (
+                <View key={share.share_id} style={styles.actionShareItem}>
+                  <View style={styles.actionShareTextArea}>
+                    <Text style={styles.actionShareTitle} numberOfLines={1}>
+                      {share.action_title}
+                    </Text>
+                    <Text style={styles.actionShareMeta} numberOfLines={1}>
+                      {share.sender_nickname}님이 함께하자고 보냈어요
+                    </Text>
+                  </View>
+                  <Button
+                    label={share.status === 'started' ? '인증' : '시작'}
+                    onPress={() => handleStartActionShare(share)}
+                    loading={startingShareId === share.share_id}
+                    disabled={startingShareId !== null}
+                    style={styles.startActionButton}
+                  />
                 </View>
-                <View style={[styles.statusBadge, getActionShareStatusStyle(share.status)]}>
-                  <Text style={styles.statusBadgeText}>
-                    {getActionShareStatusLabel(share.status)}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )
         ) : null}
 
-        {sentInvites.length > 0 ? (
-          <View style={styles.sentInvites}>
-            <Text style={styles.sectionTitle}>보낸 초대</Text>
-            {sentInvites.slice(0, 3).map((invite) => (
-              <View key={invite.invite_id} style={styles.inviteHistoryItem}>
-                <Text style={styles.inviteHistoryCode}>{invite.invite_code}</Text>
-                <Text style={styles.inviteHistoryStatus}>{formatInviteStatus(invite)}</Text>
-              </View>
-            ))}
-          </View>
+        {activeSection === 'sentActions' ? (
+          sentActionShares.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>보낸 액션이 없어요</Text>
+              <Text style={styles.emptyText}>액션 상세에서 친구에게 함께하기를 보내보세요.</Text>
+            </View>
+          ) : (
+            <View style={styles.sentActions}>
+              {sentActionShares.map((share) => (
+                <View key={share.share_id} style={styles.sentActionItem}>
+                  <View style={styles.actionShareTextArea}>
+                    <Text style={styles.actionShareTitle} numberOfLines={1}>
+                      {share.action_title}
+                    </Text>
+                    <Text style={styles.actionShareMeta} numberOfLines={1}>
+                      {share.recipient_nickname}님에게 보냈어요
+                    </Text>
+                  </View>
+                  <View style={[styles.statusBadge, getActionShareStatusStyle(share.status)]}>
+                    <Text style={styles.statusBadgeText}>
+                      {getActionShareStatusLabel(share.status)}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )
+        ) : null}
+
+        {activeSection === 'sentInvites' ? (
+          sentInvites.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>보낸 초대가 없어요</Text>
+              <Text style={styles.emptyText}>친구 초대를 만들면 초대 상태를 확인할 수 있어요.</Text>
+            </View>
+          ) : (
+            <View style={styles.sentInvites}>
+              {sentInvites.map((invite) => (
+                <View key={invite.invite_id} style={styles.inviteHistoryItem}>
+                  <Text style={styles.inviteHistoryCode}>{invite.invite_code}</Text>
+                  <Text style={styles.inviteHistoryStatus}>{formatInviteStatus(invite)}</Text>
+                </View>
+              ))}
+            </View>
+          )
         ) : null}
       </ScrollView>
     </SafeAreaView>
@@ -419,13 +503,48 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   acceptButton: { width: 88 },
-  listHeader: {
+  segmentHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.sm,
     marginTop: Spacing.sm,
   },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  segmentedControl: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.full,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  segmentButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  segmentButtonActive: {
+    backgroundColor: Colors.primary,
+  },
+  segmentButtonText: {
+    maxWidth: '100%',
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  segmentCountText: {
+    maxWidth: '100%',
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    marginTop: 1,
+  },
+  segmentButtonTextActive: { color: Colors.white },
   emptyBox: {
     backgroundColor: Colors.white,
     borderRadius: Radius.md,

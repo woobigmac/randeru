@@ -105,8 +105,9 @@ export function getInviteLink(inviteCode: string): string {
 
 export function getInviteShareMessage(invite: FriendInvite): string {
   return [
-    `${invite.inviter_nickname}님이 란데루에 초대했어요.`,
-    '같은 액션을 함께 시작하고 기록으로 남겨봐요.',
+    '하루에 하나, 인간다운 액션🪻',
+    `${invite.inviter_nickname}님이 랜데루로 초대했어요.`,
+    '친구와 함께 인간다운 액션을 함께 시작하고 기록으로 남겨봐요',
     '',
     `초대 코드: ${invite.invite_code}`,
     `초대 링크: ${getInviteLink(invite.invite_code)}`,

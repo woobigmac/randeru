@@ -7,7 +7,8 @@
   },
   "scripts": {
     "check": "node --check index.js",
-    "deploy": "firebase deploy --only functions"
+    "deploy": "firebase deploy --only functions",
+    "seed:friend-action-demo": "node scripts/seedFriendActionDemo.js"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0",

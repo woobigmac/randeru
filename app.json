@@ -2,7 +2,8 @@
   "expo": {
     "name": "randeru",
     "slug": "randeru",
-    "version": "1.0.3",
+    "scheme": "randeru",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

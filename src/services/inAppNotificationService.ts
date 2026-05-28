@@ -10,8 +10,15 @@ import {
   where,
   type Transaction,
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from './firebase';
+import app from './firebase';
 import { InAppNotification, InAppNotificationType } from '../types';
+
+const DEFAULT_FUNCTIONS_REGION = 'asia-northeast3';
+const functionsRegion =
+  process.env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION || DEFAULT_FUNCTIONS_REGION;
+const functions = getFunctions(app, functionsRegion);
 
 type NotificationPayload = {
   type: InAppNotificationType;
@@ -63,7 +70,7 @@ export function queueNotificationInTransaction(
   transaction: Transaction,
   userId: string,
   payload: NotificationPayload,
-): void {
+): string {
   const notificationRef = doc(collection(db, 'users', userId, 'notifications'));
   transaction.set(notificationRef, {
     user_id: userId,
@@ -71,6 +78,18 @@ export function queueNotificationInTransaction(
     is_read: false,
     created_at: serverTimestamp(),
   });
+  return notificationRef.id;
+}
+
+export async function sendNotificationPush(
+  userId: string,
+  notificationId: string,
+): Promise<void> {
+  const callable = httpsCallable<
+    { userId: string; notificationId: string },
+    { sent?: boolean; reason?: string }
+  >(functions, 'sendNotificationPush');
+  await callable({ userId, notificationId });
 }
 
 export async function getUserNotifications(userId: string): Promise<InAppNotification[]> {

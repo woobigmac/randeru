@@ -29,6 +29,34 @@ The Expo app should use the same region via:
 npm run check
 ```
 
+## Seed Friend Action Demo
+
+Creates a safe demo dataset for a real friend pair:
+
+- bidirectional friend documents
+- a completed sender record
+- a completed recipient record from `source: "friend_share"`
+- a completed `friend_action_shares` document
+- in-app notifications for the scenario
+
+Dry run:
+
+```bash
+npm run seed:friend-action-demo -- --user-id USER_ID --friend-id FRIEND_ID
+```
+
+Write to Firestore:
+
+```bash
+npm run seed:friend-action-demo -- --user-id USER_ID --friend-id FRIEND_ID --apply
+```
+
+Optional:
+
+```bash
+npm run seed:friend-action-demo -- --user-id USER_ID --friend-id FRIEND_ID --friend-nickname "QA 친구" --action-id ACTION_ID --date YYYY-MM-DD --apply
+```
+
 ## Deploy
 
 ```bash
