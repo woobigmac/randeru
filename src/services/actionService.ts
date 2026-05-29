@@ -161,6 +161,7 @@ export async function getActionById(actionId: string): Promise<Action | null> {
 export async function getRandomAction(
   excludeIds: string[],
   _tones: Tone[],
+  slotId?: SlotId,
 ): Promise<Action | null> {
   try {
     const q = query(
@@ -170,13 +171,43 @@ export async function getRandomAction(
     const snapshot = await firestoreTimeout(getDocs(q));
     const candidates = snapshot.docs
       .map((d) => ({ action_id: d.id, ...d.data() } as Action))
-      .filter((a) => !excludeIds.includes(a.action_id));
+      .filter((a) => !excludeIds.includes(a.action_id))
+      .filter((a) => isActionAvailableForSlot(a, slotId));
     if (candidates.length === 0) return null;
     return candidates[Math.floor(Math.random() * candidates.length)];
   } catch (e) {
     console.error('getRandomAction error:', e);
     return null;
   }
+}
+
+function isWeekend(date: Date): boolean {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function hasRestriction(values?: Record<string, boolean | undefined>): boolean {
+  if (!values) return false;
+  return Object.values(values).some((value) => value === false);
+}
+
+function isActionAvailableForSlot(action: Action, slotId?: SlotId, date = new Date()): boolean {
+  if (!slotId) return true;
+
+  const slotAvailability = action.slot_availability;
+  const dayAvailability = action.day_availability;
+  const dayKey = isWeekend(date) ? 'weekend' : 'weekday';
+  const slotAllowed = slotAvailability?.[slotId] ?? true;
+  const dayAllowed = dayAvailability?.[dayKey] ?? true;
+
+  if (action.availability_operator === 'any') {
+    const slotRestricted = hasRestriction(slotAvailability);
+    const dayRestricted = hasRestriction(dayAvailability);
+    if (!slotRestricted && !dayRestricted) return true;
+    return (slotRestricted && slotAllowed) || (dayRestricted && dayAllowed);
+  }
+
+  return slotAllowed && dayAllowed;
 }
 
 /**

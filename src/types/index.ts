@@ -30,6 +30,11 @@ export interface Action {
   is_photo_required: boolean;
   share_copy_template: string;
   media_type?: 'photo' | 'video' | 'both';
+  slot_availability?: Partial<Record<SlotId, boolean>>;
+  day_availability?: { weekday?: boolean; weekend?: boolean };
+  availability_operator?: 'all' | 'any';
+  availability_note?: string;
+  weather_condition?: 'rain' | null;
 }
 
 export interface DailyRecord {

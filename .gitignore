@@ -10,6 +10,8 @@ web-build/
 expo-env.d.ts
 build/
 ExportOptions.plist
+backups/
+outputs/
 
 # Native
 .kotlin/

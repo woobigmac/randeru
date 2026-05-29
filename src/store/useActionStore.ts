@@ -107,7 +107,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
         .filter((s) => s.action !== null)
         .map((s) => s.action!.action_id);
 
-      const action = await getRandomAction(usedIds, []);
+      const action = await getRandomAction(usedIds, [], slotId);
       if (!action) {
         set({ error: '사용 가능한 액션이 없어요' });
         return;
@@ -203,7 +203,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
 
       set({ isAdLoading: false, isLoading: true });
       const usedIds = todaySlots.filter((s) => s.action).map((s) => s.action!.action_id);
-      const newAction = await getRandomAction(usedIds, []);
+      const newAction = await getRandomAction(usedIds, [], activeSlotId);
       if (!newAction) {
         set({ error: '다른 액션을 찾지 못했어요' });
         return;
