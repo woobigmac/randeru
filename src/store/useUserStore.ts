@@ -107,15 +107,17 @@ export const useUserStore = create<UserState>((set, get) => ({
       isNewUser = false;
     } else {
       // 신규 유저 생성
+      const kakaoProfileImage =
+        typeof profileImage === 'string' && profileImage.length > 0 ? profileImage : undefined;
       user = {
         user_id: docId,
         nickname,
         kakaoId,
-        profileImage,
         loginType: 'kakao',
         push_enabled: false,
         push_time: DEFAULT_PUSH_TIME,
         created_at: new Date(),
+        ...(kakaoProfileImage && { profileImage: kakaoProfileImage }),
         ...(firebaseUid && { firebase_uid: firebaseUid }),
       };
       await setDoc(docRef, user);
