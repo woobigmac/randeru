@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +18,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Header } from '../../components/Header';
 import { Button } from '../../components/Button';
 import { useUserStore } from '../../store/useUserStore';
+import { useActionStore } from '../../store/useActionStore';
+import { useFriendStore } from '../../store/useFriendStore';
 import { MyPageStackParamList } from '../../navigation/MyPageStackNavigator';
 import { getActionById } from '../../services/actionService';
 import {
@@ -25,12 +27,16 @@ import {
   createFriendInvite,
   FriendInviteError,
   getFriends,
-  getInviteShareMessage,
   getSentFriendInvites,
+  normalizeInviteCode,
 } from '../../services/friendService';
+import { shareInvite } from '../../services/kakaoShareService';
+import { clearPendingInviteCode } from '../../services/pendingInviteStorage';
 import {
+  cancelReceivedActionShare,
   getReceivedActionShares,
   getSentActionShares,
+  shareActionWithFriend,
   startReceivedActionShare,
 } from '../../services/friendActionService';
 import { Friend, FriendActionShare, FriendInvite } from '../../types';
@@ -93,6 +99,8 @@ function getActionShareStatusStyle(status: FriendActionShare['status']) {
 
 export default function FriendsScreen({ navigation, route }: Props) {
   const user = useUserStore((state) => state.user);
+  const { todayAction, todayRecord } = useActionStore();
+  const { loadReceivedActionCount } = useFriendStore();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [sentInvites, setSentInvites] = useState<FriendInvite[]>([]);
   const [receivedActionShares, setReceivedActionShares] = useState<FriendActionShare[]>([]);
@@ -104,6 +112,10 @@ export default function FriendsScreen({ navigation, route }: Props) {
   const [isAcceptingInvite, setIsAcceptingInvite] = useState(false);
   const [startingShareId, setStartingShareId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<FriendManageSection>('friends');
+  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+  const [isSendingAction, setIsSendingAction] = useState(false);
+  const [cancellingShareId, setCancellingShareId] = useState<string | null>(null);
+  const [pendingLinkedInviteCode, setPendingLinkedInviteCode] = useState<string | null>(null);
 
   const latestPendingInvite = useMemo(
     () => sentInvites.find((invite) => invite.status === 'pending') ?? null,
@@ -140,10 +152,6 @@ export default function FriendsScreen({ navigation, route }: Props) {
     }
   }, [user?.user_id]);
 
-  useEffect(() => {
-    void loadFriendsData();
-  }, [loadFriendsData]);
-
   useFocusEffect(
     useCallback(() => {
       void loadFriendsData();
@@ -159,7 +167,7 @@ export default function FriendsScreen({ navigation, route }: Props) {
       const invite = await createFriendInvite(user);
       setActiveInvite(invite);
       setSentInvites((prev) => [invite, ...prev]);
-      await Share.share({ message: getInviteShareMessage(invite) });
+      await shareInvite(invite);
     } catch (error) {
       console.warn('createFriendInvite error:', error);
       Alert.alert('초대 코드를 만들지 못했어요', '잠시 후 다시 시도해주세요.');
@@ -170,7 +178,7 @@ export default function FriendsScreen({ navigation, route }: Props) {
 
   const handleShareInvite = async () => {
     if (!inviteToShow) return;
-    await Share.share({ message: getInviteShareMessage(inviteToShow) });
+    await shareInvite(inviteToShow);
   };
 
   const handleCopyInvite = async () => {
@@ -185,10 +193,15 @@ export default function FriendsScreen({ navigation, route }: Props) {
     try {
       const friend = await acceptFriendInvite(code, user);
       setInviteCode('');
+      setPendingLinkedInviteCode(null);
+      void clearPendingInviteCode();
       Alert.alert('친구 등록 완료', `${friend.nickname}님과 친구가 되었어요.`);
       await loadFriendsData();
     } catch (error) {
       console.warn('acceptFriendInvite error:', error);
+      // 만료·self·already_friends 등 모든 실패 케이스에서도 저장된 코드를 제거
+      setPendingLinkedInviteCode(null);
+      void clearPendingInviteCode();
       Alert.alert('친구 등록 실패', getInviteErrorMessage(error));
     } finally {
       setIsAcceptingInvite(false);
@@ -199,21 +212,63 @@ export default function FriendsScreen({ navigation, route }: Props) {
     await acceptInviteCode(inviteCode);
   };
 
+  const handleAcceptLinkedInvite = async () => {
+    if (!pendingLinkedInviteCode) return;
+    const code = pendingLinkedInviteCode;
+    setPendingLinkedInviteCode(null);
+    await acceptInviteCode(code);
+  };
+
+  const handlePasteInviteCode = async () => {
+    const text = await Clipboard.getStringAsync();
+    if (text) setInviteCode(normalizeInviteCode(text).slice(0, 8));
+  };
+
+  const handleFriendPress = (friend: Friend) => {
+    if (!todayAction) {
+      Alert.alert('오늘의 액션이 없어요', '홈에서 오늘의 액션을 먼저 받아주세요.');
+      return;
+    }
+    setSelectedFriend(friend);
+  };
+
+  const handleSendAction = async () => {
+    if (!user || !selectedFriend || !todayAction) return;
+    setIsSendingAction(true);
+    try {
+      await shareActionWithFriend(user, selectedFriend, todayAction, todayRecord?.record_id);
+      setSelectedFriend(null);
+      Alert.alert(
+        '액션을 보냈어요',
+        `${selectedFriend.nickname}님에게 "${todayAction.title}" 액션을 보냈어요.`,
+      );
+      await loadFriendsData();
+    } catch (error) {
+      console.warn('shareActionWithFriend error:', error);
+      Alert.alert('전송 실패', '액션을 보내지 못했어요. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsSendingAction(false);
+    }
+  };
+
+  const isValidInviteCode = /^[A-Z0-9]{8}$/.test(inviteCode);
+
   useEffect(() => {
     const linkedInviteCode = route.params?.inviteCode;
     if (!linkedInviteCode || !user) return;
 
     setInviteCode(linkedInviteCode);
+    setPendingLinkedInviteCode(linkedInviteCode);
     navigation.setParams({ inviteCode: undefined });
-    Alert.alert(
-      '친구 초대 도착',
-      `초대 코드 ${linkedInviteCode}로 친구를 등록할까요?`,
-      [
-        { text: '나중에', style: 'cancel' },
-        { text: '등록', onPress: () => acceptInviteCode(linkedInviteCode) },
-      ],
-    );
   }, [navigation, route.params?.inviteCode, user]);
+
+  useEffect(() => {
+    const section = route.params?.section;
+    if (section) {
+      setActiveSection(section);
+      navigation.setParams({ section: undefined });
+    }
+  }, [navigation, route.params?.section]);
 
   const handleStartActionShare = async (share: FriendActionShare) => {
     if (!user) return;
@@ -246,10 +301,67 @@ export default function FriendsScreen({ navigation, route }: Props) {
     }
   };
 
+  const handleCancelActionShare = (share: FriendActionShare) => {
+    Alert.alert(
+      '액션 거절',
+      `${share.sender_nickname}님의 "${share.action_title}" 액션을 거절할까요?`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '거절',
+          style: 'destructive',
+          onPress: async () => {
+            setCancellingShareId(share.share_id);
+            try {
+              await cancelReceivedActionShare(share.share_id);
+              setReceivedActionShares((prev) =>
+                prev.filter((s) => s.share_id !== share.share_id),
+              );
+              if (user?.user_id) void loadReceivedActionCount(user.user_id);
+            } catch (error) {
+              console.warn('cancelReceivedActionShare error:', error);
+              Alert.alert('거절 실패', '잠시 후 다시 시도해주세요.');
+            } finally {
+              setCancellingShareId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Header title="친구" showBack />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {pendingLinkedInviteCode ? (
+          <View style={styles.linkedInviteBanner}>
+            <Text style={styles.linkedInviteBannerText}>
+              초대 코드 <Text style={styles.linkedInviteCode}>{pendingLinkedInviteCode}</Text>가 도착했어요
+            </Text>
+            <View style={styles.linkedInviteBannerActions}>
+              <TouchableOpacity
+                onPress={() => {
+                  setPendingLinkedInviteCode(null);
+                  setInviteCode('');
+                }}
+                style={styles.linkedInviteDismiss}
+              >
+                <Text style={styles.linkedInviteDismissText}>나중에</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleAcceptLinkedInvite}
+                disabled={isAcceptingInvite}
+                style={styles.linkedInviteAccept}
+              >
+                <Text style={styles.linkedInviteAcceptText}>
+                  {isAcceptingInvite ? '등록 중...' : '지금 등록하기'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.invitePanel}>
           <Text style={styles.panelTitle}>친구 초대</Text>
           <Text style={styles.panelDescription}>
@@ -291,21 +403,29 @@ export default function FriendsScreen({ navigation, route }: Props) {
           <View style={styles.codeInputRow}>
             <TextInput
               value={inviteCode}
-              onChangeText={setInviteCode}
+              onChangeText={(t) => setInviteCode(normalizeInviteCode(t).slice(0, 8))}
               placeholder="예: A7B9CD2E"
               autoCapitalize="characters"
               autoCorrect={false}
+              autoComplete="off"
+              maxLength={8}
               style={styles.codeInput}
               placeholderTextColor={Colors.textTertiary}
             />
+            <TouchableOpacity onPress={handlePasteInviteCode} style={styles.pasteButton}>
+              <Text style={styles.pasteButtonText}>붙여넣기</Text>
+            </TouchableOpacity>
             <Button
               label="등록"
               onPress={handleAcceptInvite}
               loading={isAcceptingInvite}
-              disabled={!inviteCode.trim()}
+              disabled={!isValidInviteCode}
               style={styles.acceptButton}
             />
           </View>
+          {inviteCode.length > 0 && !isValidInviteCode ? (
+            <Text style={styles.codeInputHint}>초대 코드는 영문 대문자·숫자 8자리예요</Text>
+          ) : null}
         </View>
 
         <View style={styles.segmentHeader}>
@@ -347,15 +467,24 @@ export default function FriendsScreen({ navigation, route }: Props) {
           ) : (
             <View style={styles.friendList}>
               {friends.map((friend) => (
-                <View key={friend.friend_user_id} style={styles.friendItem}>
+                <TouchableOpacity
+                  key={friend.friend_user_id}
+                  style={styles.friendItem}
+                  onPress={() => handleFriendPress(friend)}
+                  activeOpacity={0.7}
+                >
                   <View style={styles.avatar}>
                     <Text style={styles.avatarText}>{getInitial(friend.nickname)}</Text>
                   </View>
                   <View style={styles.friendInfo}>
                     <Text style={styles.friendName}>{friend.nickname}</Text>
-                    <Text style={styles.friendMeta}>함께한 액션 기록 준비 중</Text>
+                    {todayAction ? (
+                      <Text style={styles.friendMeta}>함께 액션하기 →</Text>
+                    ) : (
+                      <Text style={styles.friendMeta}>오늘의 액션을 받은 뒤 함께할 수 있어요</Text>
+                    )}
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           )
@@ -379,13 +508,22 @@ export default function FriendsScreen({ navigation, route }: Props) {
                       {share.sender_nickname}님이 함께하자고 보냈어요
                     </Text>
                   </View>
-                  <Button
-                    label={share.status === 'started' ? '인증' : '시작'}
-                    onPress={() => handleStartActionShare(share)}
-                    loading={startingShareId === share.share_id}
-                    disabled={startingShareId !== null}
-                    style={styles.startActionButton}
-                  />
+                  <View style={styles.actionShareButtons}>
+                    <Button
+                      label={share.status === 'started' ? '인증' : '시작'}
+                      onPress={() => handleStartActionShare(share)}
+                      loading={startingShareId === share.share_id}
+                      disabled={startingShareId !== null || cancellingShareId !== null}
+                      style={styles.startActionButton}
+                    />
+                    <TouchableOpacity
+                      onPress={() => handleCancelActionShare(share)}
+                      disabled={cancellingShareId === share.share_id || startingShareId !== null}
+                      style={styles.cancelActionButton}
+                    >
+                      <Text style={styles.cancelActionButtonText}>거절</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))}
             </View>
@@ -439,6 +577,47 @@ export default function FriendsScreen({ navigation, route }: Props) {
           )
         ) : null}
       </ScrollView>
+
+      {/* 친구와 함께 액션하기 모달 */}
+      <Modal
+        visible={selectedFriend !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedFriend(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSelectedFriend(null)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>
+              {selectedFriend?.nickname}님과 함께 액션하기
+            </Text>
+            {todayAction ? (
+              <>
+                <View style={styles.modalActionBox}>
+                  <Text style={styles.modalActionLabel}>오늘의 액션</Text>
+                  <Text style={styles.modalActionTitle}>{todayAction.title}</Text>
+                </View>
+                <Button
+                  label="함께 액션하기"
+                  onPress={handleSendAction}
+                  loading={isSendingAction}
+                  style={styles.modalButton}
+                />
+              </>
+            ) : null}
+            <Button
+              label="취소"
+              onPress={() => setSelectedFriend(null)}
+              variant="text"
+              style={styles.modalCancelButton}
+            />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -503,6 +682,44 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   acceptButton: { width: 88 },
+  pasteButton: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pasteButtonText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
+  codeInputHint: { marginTop: 4, fontSize: 12, color: Colors.error ?? Colors.textSecondary },
+  linkedInviteBanner: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  linkedInviteBannerText: { fontSize: 14, color: '#fff', fontWeight: '500' },
+  linkedInviteCode: { fontWeight: '700', letterSpacing: 1 },
+  linkedInviteBannerActions: { flexDirection: 'row', gap: Spacing.sm },
+  linkedInviteDismiss: {
+    flex: 1,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+  },
+  linkedInviteDismissText: { fontSize: 13, color: '#fff', fontWeight: '600' },
+  linkedInviteAccept: {
+    flex: 2,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+  },
+  linkedInviteAcceptText: { fontSize: 13, color: Colors.primary, fontWeight: '700' },
   segmentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -587,6 +804,44 @@ const styles = StyleSheet.create({
   friendInfo: { flex: 1 },
   friendName: { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 2 },
   friendMeta: { fontSize: 12, color: Colors.textSecondary },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    padding: Spacing.lg,
+    paddingBottom: Spacing.xxl,
+    gap: Spacing.md,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+    alignSelf: 'center',
+    marginBottom: Spacing.sm,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+    textAlign: 'center',
+  },
+  modalActionBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    gap: 4,
+  },
+  modalActionLabel: { fontSize: 12, color: Colors.textSecondary },
+  modalActionTitle: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  modalButton: { marginTop: Spacing.sm },
+  modalCancelButton: { alignSelf: 'center' },
   sentInvites: { gap: Spacing.xs },
   sentActions: { gap: Spacing.xs },
   receivedActions: { gap: Spacing.xs },
@@ -603,7 +858,16 @@ const styles = StyleSheet.create({
   actionShareTextArea: { flex: 1 },
   actionShareTitle: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 3 },
   actionShareMeta: { fontSize: 12, color: Colors.textSecondary },
-  startActionButton: { width: 80, height: 42, paddingHorizontal: 0 },
+  startActionButton: { width: 72, height: 42, paddingHorizontal: 0 },
+  actionShareButtons: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  cancelActionButton: {
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  cancelActionButtonText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
   sentActionItem: {
     flexDirection: 'row',
     alignItems: 'center',

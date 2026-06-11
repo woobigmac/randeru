@@ -43,7 +43,7 @@ function generateInviteCode(): string {
   return code;
 }
 
-function normalizeInviteCode(inviteCode: string): string {
+export function normalizeInviteCode(inviteCode: string): string {
   return inviteCode.trim().replace(/\s/g, '').toUpperCase();
 }
 

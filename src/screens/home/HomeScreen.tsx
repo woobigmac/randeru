@@ -13,6 +13,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useUserStore } from '../../store/useUserStore';
 import { useActionStore } from '../../store/useActionStore';
+import { useFriendStore } from '../../store/useFriendStore';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { MainTabParamList } from '../../navigation/MainTabNavigator';
 import { DAILY_SLOTS, MAX_RESHUFFLE_COUNT } from '../../constants';
@@ -39,6 +40,7 @@ export default function HomeScreen({ navigation }: Props) {
     todaySlots,
     activeSlotId,
     isLoading,
+    isReceiving,
     isAdLoading,
     error,
     loadTodaySlots,
@@ -46,9 +48,13 @@ export default function HomeScreen({ navigation }: Props) {
     setActiveSlot,
     reshuffleWithAd,
   } = useActionStore();
+  const { receivedActionCount, loadReceivedActionCount } = useFriendStore();
 
   useEffect(() => {
-    if (user?.user_id) loadTodaySlots(user.user_id);
+    if (user?.user_id) {
+      loadTodaySlots(user.user_id);
+      loadReceivedActionCount(user.user_id);
+    }
   }, [user?.user_id]);
 
   const activeSlot = todaySlots.find((s) => s.slot_id === activeSlotId) ?? null;
@@ -93,6 +99,25 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={styles.date}>{getTodayStr()}</Text>
       </View>
 
+      {/* 받은 액션 배너 */}
+      {receivedActionCount > 0 && (
+        <TouchableOpacity
+          style={styles.receivedActionBanner}
+          onPress={() =>
+            navigation.navigate('MyPage', {
+              screen: 'Friends',
+              params: { section: 'receivedActions' },
+            } as never)
+          }
+          activeOpacity={0.8}
+        >
+          <Text style={styles.receivedActionBannerText}>
+            🪻 친구가 보낸 액션 {receivedActionCount}개가 있어요
+          </Text>
+          <Text style={styles.receivedActionBannerArrow}>›</Text>
+        </TouchableOpacity>
+      )}
+
       {/* 슬롯 탭 */}
       <View style={styles.tabRow}>
         {DAILY_SLOTS.map((slot) => {
@@ -106,6 +131,7 @@ export default function HomeScreen({ navigation }: Props) {
               key={slot.id}
               onPress={() => setActiveSlot(slot.id)}
               activeOpacity={0.75}
+              disabled={isLocked}
               style={[
                 styles.tab,
                 isActive && styles.tabActive,
@@ -131,6 +157,7 @@ export default function HomeScreen({ navigation }: Props) {
         <SlotContent
           slot={activeSlot}
           slotId={activeSlotId}
+          isReceiving={isReceiving}
           isAdLoading={isAdLoading}
           hasDailyFreeReshuffle={hasDailyFreeReshuffle}
           onReceive={() => {
@@ -182,6 +209,7 @@ export default function HomeScreen({ navigation }: Props) {
 type SlotContentProps = {
   slot: DailySlotStatus | null;
   slotId: SlotId | null;
+  isReceiving: boolean;
   isAdLoading: boolean;
   hasDailyFreeReshuffle: boolean;
   onReceive: () => void;
@@ -195,6 +223,7 @@ type SlotContentProps = {
 function SlotContent({
   slot,
   slotId,
+  isReceiving,
   isAdLoading,
   hasDailyFreeReshuffle,
   onReceive,
@@ -234,10 +263,10 @@ function SlotContent({
           <Text style={styles.dashedSub}>매 시간대마다 새로운 랜데루</Text>
         </View>
         <Button
-          label={`${slot.label} 액션 뽑기`}
+          label={isReceiving ? '뽑는 중...' : `${slot.label} 액션 뽑기`}
           onPress={onReceive}
           style={styles.mainButton}
-          disabled={isAdLoading}
+          disabled={isReceiving || isAdLoading}
         />
       </View>
     );
@@ -270,16 +299,18 @@ function SlotContent({
         {canReshuffle && (
           <Button
             label={
-              isAdLoading
-                ? '광고 로딩 중...'
-                : hasDailyFreeReshuffle
-                  ? `무료 다시뽑기 (${reshuffleLeft}회 남음)`
-                  : `광고 보고 다시뽑기 (${reshuffleLeft}회 남음)`
+              isReceiving
+                ? '뽑는 중...'
+                : isAdLoading
+                  ? '광고 로딩 중...'
+                  : hasDailyFreeReshuffle
+                    ? `무료 다시뽑기 (${reshuffleLeft}회 남음)`
+                    : `광고 보고 다시뽑기 (${reshuffleLeft}회 남음)`
             }
             onPress={onReshuffle}
             variant="text"
             style={{ marginTop: Spacing.sm }}
-            disabled={isAdLoading}
+            disabled={isReceiving || isAdLoading}
           />
         )}
       </View>
@@ -333,6 +364,29 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   date: { fontSize: 13, color: Colors.textTertiary, marginTop: 2 },
+
+  receivedActionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: Radius.md,
+  },
+  receivedActionBannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primaryDark,
+    flex: 1,
+  },
+  receivedActionBannerArrow: {
+    fontSize: 18,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
 
   tabRow: {
     flexDirection: 'row',

@@ -28,9 +28,13 @@ import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
 
 type ShareRouteParams = { record: DailyRecord; action: Action };
+type ShareStackParamList = {
+  Share: ShareRouteParams;
+  Friends: { section?: 'friends' | 'receivedActions' | 'sentActions' | 'sentInvites' } | undefined;
+};
 type Props = {
-  navigation: StackNavigationProp<Record<string, ShareRouteParams | undefined>, string>;
-  route: RouteProp<{ Share: ShareRouteParams }, 'Share'>;
+  navigation: StackNavigationProp<ShareStackParamList, 'Share'>;
+  route: RouteProp<ShareStackParamList, 'Share'>;
 };
 
 const SHARE_HASHTAGS = '#랜데루 #오늘의인간다움 #하루한번작은행동';
@@ -485,12 +489,20 @@ export default function ShareScreen({ navigation, route }: Props) {
           />
         </View>
 
+        {/* 친구와 함께 액션하기 */}
+        <Button
+          label="친구와 함께 액션하기"
+          onPress={() => navigation.navigate('Friends', { section: 'friends' })}
+          variant="secondary"
+          style={{ marginTop: Spacing.lg }}
+        />
+
         {/* 기록만 남기기 */}
         <Button
           label="기록만 남기기"
           onPress={() => navigation.popToTop()}
           variant="text"
-          style={{ marginTop: Spacing.xl }}
+          style={{ marginTop: Spacing.sm }}
         />
       </ScrollView>
     </SafeAreaView>

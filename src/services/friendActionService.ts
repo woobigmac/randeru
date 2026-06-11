@@ -6,6 +6,7 @@ import {
   runTransaction,
   serverTimestamp,
   Timestamp,
+  updateDoc,
   where,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -395,6 +396,11 @@ function mapFriendActionRecordEntry(value: unknown): FriendActionRecordEntry | n
     thumbnail_url: optionalString(data.thumbnail_url) ?? null,
     completed_at: optionalString(data.completed_at) ?? null,
   };
+}
+
+export async function cancelReceivedActionShare(shareId: string): Promise<void> {
+  const shareRef = doc(db, 'friend_action_shares', shareId);
+  await updateDoc(shareRef, { status: 'cancelled', updated_at: serverTimestamp() });
 }
 
 export async function getFriendActionRecords(

@@ -30,7 +30,8 @@ const TIMEOUT_MSG = '서버 응답이 지연되고 있어요. 네트워크를 �
 interface ActionStoreState {
   todaySlots: DailySlotStatus[];
   activeSlotId: SlotId | null;
-  isLoading: boolean;
+  isLoading: boolean;   // 최초 슬롯 로드 전용 — 전체화면 스피너에 사용
+  isReceiving: boolean; // 액션 뽑기/재추첨 — 버튼 인라인 로딩에 사용
   isAdLoading: boolean;
   error: string | null;
 
@@ -73,6 +74,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
   todaySlots: [],
   activeSlotId: null,
   isLoading: false,
+  isReceiving: false,
   isAdLoading: false,
   error: null,
   todayAction: null,
@@ -98,9 +100,9 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
   },
 
   receiveSlotAction: async (userId, slotId) => {
-    if (get().isLoading) return;
+    if (get().isReceiving) return;
 
-    set({ isLoading: true, error: null });
+    set({ isReceiving: true, error: null });
     try {
       const { todaySlots } = get();
       const usedIds = todaySlots
@@ -132,7 +134,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
       console.error('receiveSlotAction error:', e);
       set({ error: isFirestoreTimeoutError(e) ? TIMEOUT_MSG : '액션을 받아오지 못했어요' });
     } finally {
-      set({ isLoading: false });
+      set({ isReceiving: false });
     }
   },
 
@@ -180,7 +182,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
   },
 
   reshuffleWithAd: async (userId) => {
-    if (get().isLoading || get().isAdLoading) return;
+    if (get().isReceiving || get().isAdLoading) return;
 
     const { todaySlots, activeSlotId } = get();
     if (!activeSlotId) return;
@@ -191,7 +193,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
     if (reshuffleCount >= MAX_RESHUFFLE_COUNT) return;
     const useFreeReshuffle = !hasUsedDailyFreeReshuffle(todaySlots);
 
-    set({ isAdLoading: !useFreeReshuffle, isLoading: useFreeReshuffle, error: null });
+    set({ isAdLoading: !useFreeReshuffle, isReceiving: useFreeReshuffle, error: null });
     try {
       if (!useFreeReshuffle) {
         const rewarded = await showRewardedAd();
@@ -201,7 +203,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
         }
       }
 
-      set({ isAdLoading: false, isLoading: true });
+      set({ isAdLoading: false, isReceiving: true });
       const usedIds = todaySlots.filter((s) => s.action).map((s) => s.action!.action_id);
       const newAction = await getRandomAction(usedIds, [], activeSlotId);
       if (!newAction) {
@@ -250,7 +252,7 @@ export const useActionStore = create<ActionStoreState>((set, get) => ({
       console.error('reshuffleWithAd error:', e);
       set({ error: isFirestoreTimeoutError(e) ? TIMEOUT_MSG : '재추첨에 실패했어요' });
     } finally {
-      set({ isLoading: false, isAdLoading: false });
+      set({ isReceiving: false, isAdLoading: false });
     }
   },
 }));

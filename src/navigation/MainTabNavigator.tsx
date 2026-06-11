@@ -4,6 +4,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import HomeStackNavigator from './HomeStackNavigator';
 import RecordsStackNavigator from './RecordsStackNavigator';
 import MyPageStackNavigator from './MyPageStackNavigator';
+import { useFriendStore } from '../store/useFriendStore';
+import { useUserStore } from '../store/useUserStore';
 
 export type MainTabParamList = {
   HomeTab: undefined;
@@ -33,6 +35,13 @@ function tabIcon(focused: boolean) {
 }
 
 export default function MainTabNavigator() {
+  const user = useUserStore((s) => s.user);
+  const { receivedActionCount, loadReceivedActionCount } = useFriendStore();
+
+  React.useEffect(() => {
+    if (user?.user_id) loadReceivedActionCount(user.user_id);
+  }, [user?.user_id]);
+
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
       <Tab.Screen
@@ -57,6 +66,7 @@ export default function MainTabNavigator() {
         options={{
           title: '마이',
           tabBarIcon: ({ focused }) => tabIcon(focused),
+          tabBarBadge: receivedActionCount > 0 ? receivedActionCount : undefined,
         }}
       />
     </Tab.Navigator>

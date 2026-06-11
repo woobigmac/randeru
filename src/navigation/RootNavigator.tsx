@@ -19,6 +19,11 @@ import {
   scheduleDailySlotNotifications,
 } from '../services/notificationService';
 import { parseInviteCodeFromUrl } from '../services/deepLinkService';
+import {
+  clearPendingInviteCode,
+  loadPendingInviteCode,
+  savePendingInviteCode,
+} from '../services/pendingInviteStorage';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -59,13 +64,23 @@ export default function RootNavigator() {
     };
   }, []);
 
+  // 앱 재시작 시 AsyncStorage에서 미처리 초대 코드 복원
+  useEffect(() => {
+    loadPendingInviteCode().then((saved) => {
+      if (saved) setPendingInviteCode(saved);
+    });
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
     const handleUrl = (url: string | null) => {
       if (!url) return;
       const inviteCode = parseInviteCodeFromUrl(url);
-      if (inviteCode) setPendingInviteCode(inviteCode);
+      if (inviteCode) {
+        setPendingInviteCode(inviteCode);
+        void savePendingInviteCode(inviteCode);
+      }
     };
 
     Linking.getInitialURL()
@@ -106,6 +121,7 @@ export default function RootNavigator() {
       },
     } as never);
     setPendingInviteCode(null);
+    void clearPendingInviteCode();
   }, [
     hasSeenNotificationIntro,
     isLoading,

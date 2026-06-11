@@ -14,6 +14,7 @@ import { Action, DailyRecord } from '../../types';
 type CompleteStackParamList = {
   Complete: { recordId: string; actionTitle?: string; source?: DailyRecord['source'] };
   Share: { record: DailyRecord; action: Action };
+  Friends: { section?: 'friends' | 'receivedActions' | 'sentActions' | 'sentInvites' } | undefined;
 };
 
 type Props = {
@@ -77,6 +78,14 @@ export default function CompleteScreen({ navigation, route }: Props) {
                   action: todayAction,
                 })
               }
+            />
+          )}
+          {!isFriendAction && (
+            <Button
+              label="친구와 함께 액션하기"
+              onPress={() => navigation.navigate('Friends', { section: 'friends' })}
+              variant="secondary"
+              style={styles.friendButton}
             />
           )}
           <Button
@@ -155,6 +164,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: Colors.primary,
+  },
+  friendButton: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderColor: 'rgba(255,255,255,0.5)',
   },
   skipButton: {
     alignSelf: 'center',

@@ -1,7 +1,9 @@
+import { normalizeInviteCode } from './friendService';
+
 const INVITE_CODE_REGEX = /^[A-Z0-9]{4,16}$/;
 
-function normalizeInviteCode(value: string): string | null {
-  const code = value.trim().replace(/\s/g, '').toUpperCase();
+function validateNormalizedCode(value: string): string | null {
+  const code = normalizeInviteCode(value);
   return INVITE_CODE_REGEX.test(code) ? code : null;
 }
 
@@ -16,9 +18,9 @@ export function parseInviteCodeFromUrl(url: string): string | null {
     if (inviteIndex < 0) return null;
 
     const code = parts[inviteIndex + 1];
-    return code ? normalizeInviteCode(code) : null;
+    return code ? validateNormalizedCode(code) : null;
   } catch {
     const match = url.match(/(?:^|\/)invite\/([^/?#]+)/i);
-    return match ? normalizeInviteCode(decodeURIComponent(match[1])) : null;
+    return match ? validateNormalizedCode(decodeURIComponent(match[1])) : null;
   }
 }
